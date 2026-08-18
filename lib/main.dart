@@ -1,6 +1,29 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-void main() => runApp(const ServeFlowApp());
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'access_models.dart';
+import 'access_repository.dart';
+import 'app_config.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  String? initializationError;
+  if (AppConfig.isConfigured) {
+    try {
+      await Supabase.initialize(
+        url: AppConfig.supabaseUrl,
+        anonKey: AppConfig.supabasePublishableKey,
+      );
+    } catch (_) {
+      initializationError = 'We could not connect to ServeFlow. Please try again later.';
+    }
+  } else {
+    initializationError = 'Supabase configuration is missing. Start the app with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.';
+  }
+  runApp(ServeFlowApp(initializationError: initializationError));
+}
 
 const _navy = Color(0xff172033);
 const _amber = Color(0xffe78b20);
@@ -9,7 +32,8 @@ const _line = Color(0xffe9e1d5);
 const _muted = Color(0xff6f7682);
 
 class ServeFlowApp extends StatefulWidget {
-  const ServeFlowApp({super.key});
+  const ServeFlowApp({super.key, this.initializationError});
+  final String? initializationError;
   @override
   State<ServeFlowApp> createState() => _ServeFlowAppState();
 }
@@ -19,7 +43,101 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   String section = 'Overview';
   bool staffRole = false;
   String access = 'Owner access';
+  bool isFoodCourt = true;
+  bool loadingAccess = false;
+  String? authError;
+  String? pendingPhone;
+  List<BusinessAccess> availableAccess = const [];
+  BusinessAccess? selectedAccess;
+  StreamSubscription<AuthState>? _authSubscription;
+
+  SupabaseClient get _supabase => Supabase.instance.client;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initializationError == null) {
+      _authSubscription = _supabase.auth.onAuthStateChange.listen((state) {
+        if (!mounted) return;
+        if (state.event == AuthChangeEvent.signedOut) {
+          setState(() { page = AppPage.welcome; selectedAccess = null; availableAccess = const []; });
+        } else if (state.session != null && state.event != AuthChangeEvent.tokenRefreshed) {
+          _loadAccess();
+        }
+      });
+      if (_supabase.auth.currentSession != null) _loadAccess();
+    }
+  }
+
+  @override
+  void dispose() { _authSubscription?.cancel(); super.dispose(); }
+
   void go(AppPage value) => setState(() => page = value);
+
+  Future<void> _sendOtp(String phone) async {
+    setState(() { loadingAccess = true; authError = null; });
+    try {
+      await _supabase.auth.signInWithOtp(phone: phone);
+      if (mounted) setState(() { pendingPhone = phone; page = AppPage.otp; });
+    } on AuthException catch (_) {
+      if (mounted) setState(() => authError = 'We could not send a verification code. Check your phone number and try again.');
+    } catch (_) {
+      if (mounted) setState(() => authError = 'Connection problem. Please try again.');
+    } finally { if (mounted) setState(() => loadingAccess = false); }
+  }
+
+  Future<void> _verifyOtp(String token) async {
+    if (pendingPhone == null) return;
+    setState(() { loadingAccess = true; authError = null; });
+    try {
+      final response = await _supabase.auth.verifyOTP(phone: pendingPhone!, token: token, type: OtpType.sms);
+      if (response.session == null) throw const AuthException('No session');
+      await _loadAccess();
+    } on AuthException catch (_) {
+      if (mounted) setState(() => authError = 'That code is invalid or expired. Request a new code and try again.');
+    } catch (_) {
+      if (mounted) setState(() => authError = 'We could not verify the code. Please try again.');
+    } finally { if (mounted) setState(() => loadingAccess = false); }
+  }
+
+  Future<void> _loadAccess() async {
+    if (widget.initializationError != null || _supabase.auth.currentSession == null) return;
+    if (mounted) setState(() { loadingAccess = true; authError = null; });
+    try {
+      await _supabase.from('profiles').select().single();
+      final values = await AccessRepository(_supabase).loadAccess();
+      if (!mounted) return;
+      setState(() {
+        availableAccess = values;
+        loadingAccess = false;
+        if (values.isEmpty) page = AppPage.createBusiness;
+        else if (_distinctBusinesses(values).length > 1) page = AppPage.businessSelect;
+        else _selectAccess(values.first);
+      });
+    } on PostgrestException catch (_) {
+      if (mounted) setState(() { loadingAccess = false; authError = 'We could not load your workspace. Please try again.'; page = AppPage.login; });
+    } catch (_) {
+      if (mounted) setState(() { loadingAccess = false; authError = 'Connection problem. Please try again.'; page = AppPage.login; });
+    }
+  }
+
+  List<BusinessAccess> _distinctBusinesses(List<BusinessAccess> values) {
+    final seen = <String>{};
+    return values.where((value) => seen.add(value.businessId)).toList();
+  }
+
+  void _selectAccess(BusinessAccess value) {
+    selectedAccess = value;
+    isFoodCourt = value.isFoodCourt;
+    staffRole = !value.isOwner;
+    access = '${value.role[0].toUpperCase()}${value.role.substring(1)} access';
+    section = 'Overview';
+    page = AppPage.dashboard;
+  }
+
+  Future<void> _signOut() async {
+    try { await _supabase.auth.signOut(); } catch (_) { if (mounted) _notice(context, 'We could not sign you out. Please try again.'); }
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -65,7 +183,9 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
         ),
       ),
     ),
-    home: Builder(
+    home: widget.initializationError != null
+        ? ConfigurationErrorPage(message: widget.initializationError!)
+        : Builder(
       builder: (context) {
         switch (page) {
           case AppPage.welcome:
@@ -78,41 +198,62 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
           case AppPage.login:
             return LoginPage(
               onBack: () => go(AppPage.access),
-              onContinue: () => go(AppPage.otp),
+              onContinue: _sendOtp,
+              loading: loadingAccess,
+              error: authError,
             );
           case AppPage.otp:
             return OtpPage(
               onBack: () => go(AppPage.login),
-              onVerified: () => go(AppPage.createBusiness),
+              onVerified: _verifyOtp,
+              onResend: pendingPhone == null ? null : () => _sendOtp(pendingPhone!),
+              loading: loadingAccess,
+              error: authError,
             );
           case AppPage.createBusiness:
             return CreateBusinessPage(
               onBack: () => go(AppPage.otp),
-              onCreate: () => go(AppPage.success),
+              onCreate: (foodCourt) {
+                setState(() => isFoodCourt = foodCourt);
+                go(AppPage.success);
+              },
             );
           case AppPage.success:
             return SuccessPage(onOpen: () => go(AppPage.dashboard));
+          case AppPage.businessSelect:
+            return BusinessSelectPage(
+              access: _distinctBusinesses(availableAccess),
+              onSelect: (business) {
+                final first = availableAccess.firstWhere((value) => value.businessId == business.businessId);
+                setState(() => _selectAccess(first));
+              },
+              onLogout: _signOut,
+            );
           case AppPage.dashboard:
             return DashboardPage(
               section: section,
               staffRole: staffRole,
               access: access,
+              isFoodCourt: isFoodCourt,
               onSection: (s) => setState(() => section = s),
               onAddStaff: () => go(AppPage.addStaff),
               onStaff: () => go(AppPage.staffDetails),
               onSwitch: () => setState(() {
-                staffRole = !staffRole;
-                access = staffRole ? 'Kitchen manager' : 'Owner access';
-                section = 'Overview';
+                if (selectedAccess != null && !selectedAccess!.isOwner) {
+                  final assignments = availableAccess.where((item) => item.businessId == selectedAccess!.businessId && item.stallId != null).toList();
+                  if (assignments.length > 1) _selectAccess(assignments[(assignments.indexWhere((item) => item.stallId == selectedAccess!.stallId) + 1) % assignments.length]);
+                }
               }),
+              onLogout: _signOut,
             );
           case AppPage.addStaff:
             return AddStaffPage(
+              isFoodCourt: isFoodCourt,
               onBack: () => go(AppPage.dashboard),
               onSend: () => go(AppPage.staffDetails),
             );
           case AppPage.staffDetails:
-            return StaffDetailsPage(onBack: () => go(AppPage.dashboard));
+            return StaffDetailsPage(isFoodCourt: isFoodCourt, onBack: () => go(AppPage.dashboard));
         }
       },
     ),
@@ -126,6 +267,7 @@ enum AppPage {
   otp,
   createBusiness,
   success,
+  businessSelect,
   dashboard,
   addStaff,
   staffDetails,
@@ -543,18 +685,25 @@ class OtpPage extends StatelessWidget {
   );
 }
 
-class CreateBusinessPage extends StatelessWidget {
+class CreateBusinessPage extends StatefulWidget {
   const CreateBusinessPage({
     super.key,
     required this.onBack,
     required this.onCreate,
   });
-  final VoidCallback onBack, onCreate;
+  final VoidCallback onBack;
+  final ValueChanged<bool> onCreate;
+  @override
+  State<CreateBusinessPage> createState() => _CreateBusinessPageState();
+}
+
+class _CreateBusinessPageState extends State<CreateBusinessPage> {
+  bool isFoodCourt = false;
   @override
   Widget build(BuildContext context) => AuthShell(
     title: 'Tell us about your place.',
     subtitle: 'A few details and your workspace is ready.',
-    onBack: onBack,
+    onBack: widget.onBack,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -570,9 +719,22 @@ class CreateBusinessPage extends StatelessWidget {
           decoration: InputDecoration(hintText: 'e.g. Bengaluru'),
         ),
         const SizedBox(height: 16),
-        const _FormLabel('Number of stalls'),
+        const _FormLabel('Business type'),
         const SizedBox(height: 7),
-        DropdownButtonFormField<String>(
+        SegmentedButton<bool>(
+          segments: const [
+            ButtonSegment(value: false, icon: Icon(Icons.restaurant_rounded), label: Text('Restaurant')),
+            ButtonSegment(value: true, icon: Icon(Icons.storefront_rounded), label: Text('Food Court')),
+          ],
+          selected: {isFoodCourt},
+          onSelectionChanged: (value) => setState(() => isFoodCourt = value.first),
+        ),
+        const SizedBox(height: 10),
+        Text(isFoodCourt ? 'Food courts can manage stalls and assign staff to stalls.' : 'Restaurants manage staff directly. No stalls are required.'),
+        const SizedBox(height: 16),
+        if (isFoodCourt) const _FormLabel('Number of stalls'),
+        if (isFoodCourt) const SizedBox(height: 7),
+        if (isFoodCourt) DropdownButtonFormField<String>(
           initialValue: '3–5 stalls',
           items: const [
             DropdownMenuItem(value: '1–2 stalls', child: Text('1–2 stalls')),
@@ -583,7 +745,7 @@ class CreateBusinessPage extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: onCreate,
+          onPressed: () => widget.onCreate(isFoodCourt),
           style: _primaryStyle(full: true),
           child: const Text('Create my workspace'),
         ),
@@ -655,20 +817,27 @@ class DashboardPage extends StatelessWidget {
     required this.section,
     required this.staffRole,
     required this.access,
+    required this.isFoodCourt,
     required this.onSection,
     required this.onAddStaff,
     required this.onStaff,
     required this.onSwitch,
+    required this.onLogout,
   });
   final String section, access;
+  final bool isFoodCourt;
   final bool staffRole;
   final ValueChanged<String> onSection;
-  final VoidCallback onAddStaff, onStaff, onSwitch;
+  final VoidCallback onAddStaff, onStaff, onSwitch, onLogout;
   static const items = [
     ('Overview', Icons.grid_view_rounded),
-    ('Orders', Icons.receipt_long_outlined),
     ('Stalls', Icons.storefront_outlined),
     ('Staff', Icons.groups_2_outlined),
+    ('Menu', Icons.menu_book_outlined),
+    ('Tables', Icons.table_restaurant_outlined),
+    ('QR Codes', Icons.qr_code_2_rounded),
+    ('Orders', Icons.receipt_long_outlined),
+    ('Payments', Icons.payments_outlined),
     ('Reports', Icons.insights_outlined),
     ('Settings', Icons.settings_outlined),
   ];
@@ -679,8 +848,10 @@ class DashboardPage extends StatelessWidget {
       active: section,
       staffRole: staffRole,
       access: access,
+      isFoodCourt: isFoodCourt,
       onSection: onSection,
       onSwitch: onSwitch,
+      onLogout: onLogout,
     );
     return Scaffold(
       drawer: desktop ? null : Drawer(child: side),
@@ -703,6 +874,7 @@ class DashboardPage extends StatelessWidget {
             child: _DashboardContent(
               section: section,
               staffRole: staffRole,
+              isFoodCourt: isFoodCourt,
               onSection: onSection,
               onAddStaff: onAddStaff,
               onStaff: onStaff,
@@ -719,13 +891,17 @@ class _Sidebar extends StatelessWidget {
     required this.active,
     required this.staffRole,
     required this.access,
+    required this.isFoodCourt,
     required this.onSection,
     required this.onSwitch,
+    required this.onLogout,
   });
   final String active, access;
   final bool staffRole;
+  final bool isFoodCourt;
   final ValueChanged<String> onSection;
   final VoidCallback onSwitch;
+  final VoidCallback onLogout;
   @override
   Widget build(BuildContext context) => Container(
     color: _navy,
@@ -738,10 +914,10 @@ class _Sidebar extends StatelessWidget {
           child: Brand(light: true),
         ),
         const SizedBox(height: 43),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 11),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11),
           child: Text(
-            'THE COURTYARD',
+            isFoodCourt ? 'CENTRAL FOOD COURT' : 'ABC RESTAURANT',
             style: TextStyle(
               fontSize: 10,
               color: Color(0xff9aa5b8),
@@ -751,7 +927,7 @@ class _Sidebar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 11),
-        ...DashboardPage.items.map(
+        ...(isFoodCourt ? DashboardPage.items : DashboardPage.items.where((e) => e.$1 != 'Stalls')).map(
           (e) => Padding(
             padding: const EdgeInsets.only(bottom: 3),
             child: _SideItem(
@@ -812,10 +988,10 @@ class _Sidebar extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: onSwitch,
-                tooltip: 'Switch access',
+                onPressed: onLogout,
+                tooltip: 'Log out',
                 icon: const Icon(
-                  Icons.swap_horiz_rounded,
+                  Icons.logout_rounded,
                   size: 19,
                   color: Color(0xffffc36e),
                 ),
@@ -879,12 +1055,14 @@ class _DashboardContent extends StatelessWidget {
   const _DashboardContent({
     required this.section,
     required this.staffRole,
+    required this.isFoodCourt,
     required this.onSection,
     required this.onAddStaff,
     required this.onStaff,
   });
   final String section;
   final bool staffRole;
+  final bool isFoodCourt;
   final ValueChanged<String> onSection;
   final VoidCallback onAddStaff, onStaff;
   @override
@@ -896,7 +1074,7 @@ class _DashboardContent extends StatelessWidget {
       return const _Stalls();
     }
     if (section == 'Staff') {
-      return _Staff(onAdd: onAddStaff, onStaff: onStaff);
+      return _Staff(isFoodCourt: isFoodCourt, onAdd: onAddStaff, onStaff: onStaff);
     }
     if (section == 'Orders') {
       return const _Orders();
@@ -1488,12 +1666,13 @@ class _StallRow extends StatelessWidget {
 }
 
 class _Staff extends StatelessWidget {
-  const _Staff({required this.onAdd, required this.onStaff});
+  const _Staff({required this.isFoodCourt, required this.onAdd, required this.onStaff});
+  final bool isFoodCourt;
   final VoidCallback onAdd, onStaff;
   @override
   Widget build(BuildContext c) => _PageShell(
     title: 'Your team',
-    subtitle: 'People and permissions across The Courtyard.',
+    subtitle: isFoodCourt ? 'People and permissions across Central Food Court.' : 'Roles and permissions for ABC Restaurant.',
     action: FilledButton.icon(
       onPressed: onAdd,
       icon: const Icon(Icons.person_add_alt_1_rounded),
@@ -1527,25 +1706,19 @@ class _Staff extends StatelessWidget {
                 ],
               ),
               const Divider(color: _line),
-              _Member('Aarav Patel', 'Owner', 'All stalls', true, onStaff),
+              _Member('Vicky', 'Owner', isFoodCourt ? 'All stalls' : 'ABC Restaurant', true, onStaff),
+              const Divider(color: _line),
+              _Member('Rahul', 'Manager', isFoodCourt ? 'Pizza Stall, Burger Stall' : 'ABC Restaurant', true, onStaff),
               const Divider(color: _line),
               _Member(
-                'Maya Singh',
-                'Floor manager',
-                'All stalls',
+                'Ajay',
+                'Kitchen',
+                isFoodCourt ? 'Pizza Stall' : 'ABC Restaurant',
                 true,
                 onStaff,
               ),
               const Divider(color: _line),
-              _Member(
-                'Arjun Rao',
-                'Kitchen manager',
-                'South Bowl, Chaat & Co.',
-                true,
-                onStaff,
-              ),
-              const Divider(color: _line),
-              _Member('Priya Menon', 'Cashier', 'Melt House', false, onStaff),
+              _Member('Kumar', isFoodCourt ? 'Manager' : 'Cashier', isFoodCourt ? 'Burger Stall' : 'ABC Restaurant', false, onStaff),
             ],
           ),
         ),
@@ -1663,7 +1836,8 @@ class _Member extends StatelessWidget {
 }
 
 class AddStaffPage extends StatelessWidget {
-  const AddStaffPage({super.key, required this.onBack, required this.onSend});
+  const AddStaffPage({super.key, required this.isFoodCourt, required this.onBack, required this.onSend});
+  final bool isFoodCourt;
   final VoidCallback onBack, onSend;
   @override
   Widget build(BuildContext c) => Scaffold(
@@ -1710,29 +1884,29 @@ class AddStaffPage extends StatelessWidget {
               const _FormLabel('Role'),
               const SizedBox(height: 7),
               DropdownButtonFormField<String>(
-                initialValue: 'Kitchen manager',
+                initialValue: 'Manager',
                 items: const [
                   DropdownMenuItem(
-                    value: 'Kitchen manager',
-                    child: Text('Kitchen manager'),
+                    value: 'Manager',
+                    child: Text('Manager'),
                   ),
                   DropdownMenuItem(value: 'Cashier', child: Text('Cashier')),
                   DropdownMenuItem(
-                    value: 'Floor manager',
-                    child: Text('Floor manager'),
+                    value: 'Kitchen',
+                    child: Text('Kitchen'),
                   ),
                 ],
                 onChanged: null,
               ),
-              const SizedBox(height: 18),
-              const Text(
-                'Stall access',
+              if (isFoodCourt) const SizedBox(height: 18),
+              if (isFoodCourt) const Text(
+                'Assigned stalls',
                 style: TextStyle(fontWeight: FontWeight.w700, color: _navy),
               ),
-              const SizedBox(height: 8),
-              const _AccessCheck(label: 'South Bowl', checked: true),
-              const _AccessCheck(label: 'Chaat & Co.', checked: true),
-              const _AccessCheck(label: 'Melt House', checked: false),
+              if (isFoodCourt) const SizedBox(height: 8),
+              if (isFoodCourt) const _AccessCheck(label: 'Pizza Stall', checked: true),
+              if (isFoodCourt) const _AccessCheck(label: 'Burger Stall', checked: true),
+              if (isFoodCourt) const _AccessCheck(label: 'Juice Stall', checked: false),
               const SizedBox(height: 22),
               FilledButton.icon(
                 onPressed: onSend,
@@ -1772,7 +1946,8 @@ class _AccessCheckState extends State<_AccessCheck> {
 }
 
 class StaffDetailsPage extends StatelessWidget {
-  const StaffDetailsPage({super.key, required this.onBack});
+  const StaffDetailsPage({super.key, required this.isFoodCourt, required this.onBack});
+  final bool isFoodCourt;
   final VoidCallback onBack;
   @override
   Widget build(BuildContext c) => Scaffold(
@@ -1811,7 +1986,7 @@ class StaffDetailsPage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Arjun Rao',
+                          'Rahul',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 21,
@@ -1819,7 +1994,7 @@ class StaffDetailsPage extends StatelessWidget {
                         ),
                         SizedBox(height: 3),
                         Text(
-                          '+91 98101 23123',
+                          'rahul@example.com',
                           style: TextStyle(color: _muted),
                         ),
                         SizedBox(height: 6),
@@ -1868,7 +2043,7 @@ class StaffDetailsPage extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Arjun Rao',
+                                'Rahul',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 21,
@@ -1876,7 +2051,7 @@ class StaffDetailsPage extends StatelessWidget {
                               ),
                               SizedBox(height: 3),
                               Text(
-                                '+91 98101 23123',
+                                'rahul@example.com',
                                 style: TextStyle(color: _muted),
                               ),
                               SizedBox(height: 6),
@@ -1900,19 +2075,21 @@ class StaffDetailsPage extends StatelessWidget {
               const SizedBox(height: 22),
               Text('Roles & access', style: Theme.of(c).textTheme.titleLarge),
               const SizedBox(height: 5),
-              const Text('Access is tailored to each stall they support.'),
+              Text(isFoodCourt ? 'Rahul can switch only between the assigned stalls below.' : 'Rahul is assigned to ABC Restaurant as Manager.'),
               const SizedBox(height: 14),
-              const _RoleAccess(
-                stall: 'South Bowl',
-                role: 'Kitchen manager',
+              if (isFoodCourt) const _RoleAccess(
+                stall: 'Pizza Stall',
+                role: 'Manager',
                 details: 'Orders, preparation board, menu availability',
               ),
-              const SizedBox(height: 11),
-              const _RoleAccess(
-                stall: 'Chaat & Co.',
-                role: 'Kitchen manager',
+              if (isFoodCourt) const SizedBox(height: 11),
+              if (isFoodCourt) const _RoleAccess(
+                stall: 'Burger Stall',
+                role: 'Staff',
                 details: 'Orders, preparation board, menu availability',
               ),
+              if (!isFoodCourt) const _RoleAccess(stall: 'ABC Restaurant', role: 'Manager', details: 'Restaurant operations, menu and orders'),
+              if (isFoodCourt) const Padding(padding: EdgeInsets.only(top: 14), child: Text('Juice Stall is not assigned to Rahul and will not appear in his stall selector.', style: TextStyle(color: _muted))),
               const SizedBox(height: 22),
               Text('Recent activity', style: Theme.of(c).textTheme.titleLarge),
               const SizedBox(height: 12),
@@ -2065,7 +2242,7 @@ class _Restricted extends StatelessWidget {
               const SizedBox(height: 7),
               Text(
                 staffRole
-                    ? 'Your Kitchen manager access does not include this workspace. Ask an owner if you need more access.'
+                    ? 'Your current role does not include this workspace. Ask the owner if you need more access.'
                     : 'We’re shaping this part of ServeFlow next. Your current workspace stays exactly as it is.',
                 textAlign: TextAlign.center,
               ),
