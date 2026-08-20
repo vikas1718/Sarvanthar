@@ -14,10 +14,11 @@ Future<void> main() async {
     try {
       await Supabase.initialize(
         url: AppConfig.supabaseUrl,
-        anonKey: AppConfig.supabasePublishableKey,
+        publishableKey: AppConfig.supabasePublishableKey,
       );
     } catch (_) {
-      initializationError = 'We could not connect to ServeFlow. Please try again later.';
+      initializationError =
+          'We could not connect to ServeFlow. Please try again later.';
     }
   } else {
     initializationError = 'Supabase configuration is missing. Start the app with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.';
@@ -46,7 +47,8 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   bool isFoodCourt = true;
   bool loadingAccess = false;
   String? authError;
-  String? pendingPhone;
+  String? pendingEmail;
+  String? profileName;
   List<BusinessAccess> availableAccess = const [];
   BusinessAccess? selectedAccess;
   StreamSubscription<AuthState>? _authSubscription;
@@ -60,8 +62,13 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       _authSubscription = _supabase.auth.onAuthStateChange.listen((state) {
         if (!mounted) return;
         if (state.event == AuthChangeEvent.signedOut) {
-          setState(() { page = AppPage.welcome; selectedAccess = null; availableAccess = const []; });
-        } else if (state.session != null && state.event != AuthChangeEvent.tokenRefreshed) {
+          setState(() {
+            page = AppPage.welcome;
+            selectedAccess = null;
+            availableAccess = const [];
+          });
+        } else if (state.session != null &&
+            state.event != AuthChangeEvent.tokenRefreshed) {
           _loadAccess();
         }
       });
@@ -70,54 +77,128 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   }
 
   @override
-  void dispose() { _authSubscription?.cancel(); super.dispose(); }
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
 
   void go(AppPage value) => setState(() => page = value);
 
-  Future<void> _sendOtp(String phone) async {
-    setState(() { loadingAccess = true; authError = null; });
+  Future<void> _sendOtp(String email) async {
+    setState(() {
+      loadingAccess = true;
+      authError = null;
+    });
     try {
-      await _supabase.auth.signInWithOtp(phone: phone);
-      if (mounted) setState(() { pendingPhone = phone; page = AppPage.otp; });
+      await _supabase.auth.signInWithOtp(email: email, shouldCreateUser: true);
+      if (mounted) {
+        setState(() {
+          pendingEmail = email;
+          page = AppPage.otp;
+        });
+      }
     } on AuthException catch (_) {
-      if (mounted) setState(() => authError = 'We could not send a verification code. Check your phone number and try again.');
+      if (mounted) {
+        setState(
+          () => authError = 'We could not send a verification code. Check your email address and try again.',
+        );
+      }
     } catch (_) {
-      if (mounted) setState(() => authError = 'Connection problem. Please try again.');
-    } finally { if (mounted) setState(() => loadingAccess = false); }
+      if (mounted) {
+        setState(() => authError = 'Connection problem. Please try again.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loadingAccess = false);
+      }
+    }
   }
 
   Future<void> _verifyOtp(String token) async {
-    if (pendingPhone == null) return;
-    setState(() { loadingAccess = true; authError = null; });
+    if (pendingEmail == null) {
+      return;
+    }
+    setState(() {
+      loadingAccess = true;
+      authError = null;
+    });
     try {
-      final response = await _supabase.auth.verifyOTP(phone: pendingPhone!, token: token, type: OtpType.sms);
-      if (response.session == null) throw const AuthException('No session');
+      final response = await _supabase.auth.verifyOTP(
+        email: pendingEmail!,
+        token: token,
+        type: OtpType.email,
+      );
+      if (response.session == null) {
+        throw const AuthException('No session');
+      }
       await _loadAccess();
     } on AuthException catch (_) {
-      if (mounted) setState(() => authError = 'That code is invalid or expired. Request a new code and try again.');
+      if (mounted) {
+        setState(
+          () => authError = 'That code is invalid or expired. Request a new code and try again.',
+        );
+      }
     } catch (_) {
-      if (mounted) setState(() => authError = 'We could not verify the code. Please try again.');
-    } finally { if (mounted) setState(() => loadingAccess = false); }
+      if (mounted) {
+        setState(
+          () => authError = 'We could not verify the code. Please try again.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loadingAccess = false);
+      }
+    }
   }
 
   Future<void> _loadAccess() async {
-    if (widget.initializationError != null || _supabase.auth.currentSession == null) return;
-    if (mounted) setState(() { loadingAccess = true; authError = null; });
+    if (widget.initializationError != null ||
+        _supabase.auth.currentSession == null) {
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        loadingAccess = true;
+        authError = null;
+      });
+    }
     try {
-      await _supabase.from('profiles').select().single();
+      final profile = await _supabase
+          .from('profiles')
+          .select('full_name')
+          .maybeSingle();
       final values = await AccessRepository(_supabase).loadAccess();
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         availableAccess = values;
+        profileName = profile?['full_name'] as String?;
         loadingAccess = false;
-        if (values.isEmpty) page = AppPage.createBusiness;
-        else if (_distinctBusinesses(values).length > 1) page = AppPage.businessSelect;
-        else _selectAccess(values.first);
+        if (values.isEmpty) {
+          page = AppPage.createBusiness;
+        } else if (_distinctBusinesses(values).length > 1) {
+          page = AppPage.businessSelect;
+        } else {
+          _selectAccess(values.first);
+        }
       });
     } on PostgrestException catch (_) {
-      if (mounted) setState(() { loadingAccess = false; authError = 'We could not load your workspace. Please try again.'; page = AppPage.login; });
+      if (mounted) {
+        setState(() {
+          loadingAccess = false;
+          authError = 'We could not load your workspace. Please try again.';
+          page = AppPage.login;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() { loadingAccess = false; authError = 'Connection problem. Please try again.'; page = AppPage.login; });
+      if (mounted) {
+        setState(() {
+          loadingAccess = false;
+          authError = 'Connection problem. Please try again.';
+          page = AppPage.login;
+        });
+      }
     }
   }
 
@@ -136,7 +217,13 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   }
 
   Future<void> _signOut() async {
-    try { await _supabase.auth.signOut(); } catch (_) { if (mounted) _notice(context, 'We could not sign you out. Please try again.'); }
+    try {
+      await _supabase.auth.signOut();
+    } catch (_) {
+      if (mounted) {
+        _notice(context, 'We could not sign you out. Please try again.');
+      }
+    }
   }
 
   @override
@@ -186,76 +273,223 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     home: widget.initializationError != null
         ? ConfigurationErrorPage(message: widget.initializationError!)
         : Builder(
-      builder: (context) {
-        switch (page) {
-          case AppPage.welcome:
-            return WelcomePage(onStart: () => go(AppPage.access));
-          case AppPage.access:
-            return AccessPage(
-              onBack: () => go(AppPage.welcome),
-              onLogin: () => go(AppPage.login),
-            );
-          case AppPage.login:
-            return LoginPage(
-              onBack: () => go(AppPage.access),
-              onContinue: _sendOtp,
-              loading: loadingAccess,
-              error: authError,
-            );
-          case AppPage.otp:
-            return OtpPage(
-              onBack: () => go(AppPage.login),
-              onVerified: _verifyOtp,
-              onResend: pendingPhone == null ? null : () => _sendOtp(pendingPhone!),
-              loading: loadingAccess,
-              error: authError,
-            );
-          case AppPage.createBusiness:
-            return CreateBusinessPage(
-              onBack: () => go(AppPage.otp),
-              onCreate: (foodCourt) {
-                setState(() => isFoodCourt = foodCourt);
-                go(AppPage.success);
-              },
-            );
-          case AppPage.success:
-            return SuccessPage(onOpen: () => go(AppPage.dashboard));
-          case AppPage.businessSelect:
-            return BusinessSelectPage(
-              access: _distinctBusinesses(availableAccess),
-              onSelect: (business) {
-                final first = availableAccess.firstWhere((value) => value.businessId == business.businessId);
-                setState(() => _selectAccess(first));
-              },
-              onLogout: _signOut,
-            );
-          case AppPage.dashboard:
-            return DashboardPage(
-              section: section,
-              staffRole: staffRole,
-              access: access,
-              isFoodCourt: isFoodCourt,
-              onSection: (s) => setState(() => section = s),
-              onAddStaff: () => go(AppPage.addStaff),
-              onStaff: () => go(AppPage.staffDetails),
-              onSwitch: () => setState(() {
-                if (selectedAccess != null && !selectedAccess!.isOwner) {
-                  final assignments = availableAccess.where((item) => item.businessId == selectedAccess!.businessId && item.stallId != null).toList();
-                  if (assignments.length > 1) _selectAccess(assignments[(assignments.indexWhere((item) => item.stallId == selectedAccess!.stallId) + 1) % assignments.length]);
-                }
-              }),
-              onLogout: _signOut,
-            );
-          case AppPage.addStaff:
-            return AddStaffPage(
-              isFoodCourt: isFoodCourt,
-              onBack: () => go(AppPage.dashboard),
-              onSend: () => go(AppPage.staffDetails),
-            );
-          case AppPage.staffDetails:
-            return StaffDetailsPage(isFoodCourt: isFoodCourt, onBack: () => go(AppPage.dashboard));
-        }
-      },
+            builder: (context) {
+              switch (page) {
+                case AppPage.welcome:
+                  return WelcomePage(onStart: () => go(AppPage.access));
+                case AppPage.access:
+                  return AccessPage(
+                    onBack: () => go(AppPage.welcome),
+                    onLogin: () => go(AppPage.login),
+                  );
+                case AppPage.login:
+                  return LoginPage(
+                    onBack: () => go(AppPage.access),
+                    onContinue: _sendOtp,
+                    loading: loadingAccess,
+                    error: authError,
+                  );
+                case AppPage.otp:
+                  return OtpPage(
+                    onBack: () => go(AppPage.login),
+                    onVerified: _verifyOtp,
+                    onResend: pendingEmail == null
+                        ? null
+                        : () => _sendOtp(pendingEmail!),
+                    loading: loadingAccess,
+                    error: authError,
+                  );
+                case AppPage.createBusiness:
+                  return CreateBusinessPage(
+                    onBack: () => go(AppPage.otp),
+                    onCreate: () => _notice(
+                      context,
+                      'Your workspace can be created once its business setup details are available.',
+                    ),
+                  );
+                case AppPage.success:
+                  return SuccessPage(onOpen: () => go(AppPage.dashboard));
+                case AppPage.businessSelect:
+                  return BusinessSelectPage(
+                    access: _distinctBusinesses(availableAccess),
+                    onSelect: (business) {
+                      final first = availableAccess.firstWhere(
+                        (value) => value.businessId == business.businessId,
+                      );
+                      setState(() => _selectAccess(first));
+                    },
+                    onLogout: _signOut,
+                  );
+                case AppPage.dashboard:
+                  return DashboardPage(
+                    section: section,
+                    staffRole: staffRole,
+                    access: access,
+                    isFoodCourt: isFoodCourt,
+                    businessName: selectedAccess?.businessName ?? '',
+                    stallName: selectedAccess?.stallName,
+                    userName: profileName,
+                    stallAccess: availableAccess
+                        .where(
+                          (item) =>
+                              item.businessId == selectedAccess?.businessId &&
+                              item.stallId != null,
+                        )
+                        .toList(),
+                    onSection: (s) => setState(() => section = s),
+                    onAddStaff: () => go(AppPage.addStaff),
+                    onStaff: () => go(AppPage.staffDetails),
+                    onSelectStall: (value) =>
+                        setState(() => _selectAccess(value)),
+                    onLogout: _signOut,
+                  );
+                case AppPage.addStaff:
+                  return AddStaffPage(
+                    isFoodCourt: isFoodCourt,
+                    onBack: () => go(AppPage.dashboard),
+                    onSend: () => go(AppPage.staffDetails),
+                  );
+                case AppPage.staffDetails:
+                  return StaffDetailsPage(
+                    isFoodCourt: isFoodCourt,
+                    onBack: () => go(AppPage.dashboard),
+                  );
+              }
+            },
+          ),
+  );
+}
+
+class ConfigurationErrorPage extends StatelessWidget {
+  const ConfigurationErrorPage({super.key, required this.message});
+  final String message;
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Brand(),
+                const SizedBox(height: 28),
+                Text(
+                  'Configuration needed',
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+                const SizedBox(height: 12),
+                Text(message, textAlign: TextAlign.center),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class BusinessSelectPage extends StatelessWidget {
+  const BusinessSelectPage({
+    super.key,
+    required this.access,
+    required this.onSelect,
+    required this.onLogout,
+  });
+  final List<BusinessAccess> access;
+  final ValueChanged<BusinessAccess> onSelect;
+  final VoidCallback onLogout;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 470),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Brand(),
+                const SizedBox(height: 54),
+                Text(
+                  'Choose a workspace.',
+                  style: Theme.of(context).textTheme.headlineMedium
+                      ?.copyWith(fontSize: 38),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'You have access to more than one business. Select the one you want to open.',
+                ),
+                const SizedBox(height: 26),
+                ...access.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: () => onSelect(item),
+                        child: Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: _line),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                item.isFoodCourt
+                                    ? Icons.storefront_rounded
+                                    : Icons.restaurant_rounded,
+                                color: _amber,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      item.businessName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium,
+                                    ),
+                                    Text(
+                                      item.isFoodCourt
+                                          ? 'Food court'
+                                          : 'Restaurant',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                color: _amber,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.center,
+                  child: TextButton(
+                    onPressed: onLogout,
+                    child: const Text('Log out'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -605,32 +839,69 @@ class _AccessChoice extends StatelessWidget {
   );
 }
 
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key, required this.onBack, required this.onContinue});
-  final VoidCallback onBack, onContinue;
+class LoginPage extends StatefulWidget {
+  const LoginPage({
+    super.key,
+    required this.onBack,
+    required this.onContinue,
+    required this.loading,
+    this.error,
+  });
+  final VoidCallback onBack;
+  final ValueChanged<String> onContinue;
+  final bool loading;
+  final String? error;
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _emailController = TextEditingController();
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => AuthShell(
     title: 'Welcome back.',
-    subtitle: 'Enter your phone number and we’ll send a secure code.',
-    onBack: onBack,
+    subtitle: 'Enter your email address and we’ll send a secure code.',
+    onBack: widget.onBack,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _FormLabel('Mobile number'),
+        const _FormLabel('Email address'),
         const SizedBox(height: 8),
-        const TextField(
-          keyboardType: TextInputType.phone,
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          enableSuggestions: false,
           decoration: InputDecoration(
-            prefixText: '+91   ',
-            hintText: '98765 43210',
+            prefixIcon: const Icon(Icons.email_outlined),
+            hintText: 'you@example.com',
           ),
         ),
         const SizedBox(height: 18),
         FilledButton(
-          onPressed: onContinue,
+          onPressed: widget.loading
+              ? null
+              : () {
+                  final email = _emailController.text.trim().toLowerCase();
+                  if (email.contains('@') && email.contains('.')) {
+                    widget.onContinue(email);
+                  }
+                },
           style: _primaryStyle(full: true),
-          child: const Text('Send verification code'),
+          child: Text(
+            widget.loading ? 'Sending code...' : 'Send verification code',
+          ),
         ),
+        if (widget.error != null) ...[
+          const SizedBox(height: 12),
+          _AuthError(message: widget.error!),
+        ],
         const SizedBox(height: 16),
         const Text(
           'We’ll only use this to keep your workspace secure.',
@@ -642,46 +913,83 @@ class LoginPage extends StatelessWidget {
   );
 }
 
-class OtpPage extends StatelessWidget {
-  const OtpPage({super.key, required this.onBack, required this.onVerified});
-  final VoidCallback onBack, onVerified;
+class OtpPage extends StatefulWidget {
+  const OtpPage({
+    super.key,
+    required this.onBack,
+    required this.onVerified,
+    required this.onResend,
+    required this.loading,
+    this.error,
+  });
+  final VoidCallback onBack;
+  final ValueChanged<String> onVerified;
+  final VoidCallback? onResend;
+  final bool loading;
+  final String? error;
+  @override
+  State<OtpPage> createState() => _OtpPageState();
+}
+
+class _OtpPageState extends State<OtpPage> {
+  final _codeController = TextEditingController();
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => AuthShell(
-    title: 'Check your phone.',
-    subtitle: 'We sent a six-digit code to +91 98765 43210.',
-    onBack: onBack,
+    title: 'Check your inbox.',
+    subtitle: 'We sent a six-digit code to your email address.',
+    onBack: widget.onBack,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(
-            6,
-            (i) => SizedBox(
-              width: 44,
-              child: TextField(
-                autofocus: i == 0,
-                textAlign: TextAlign.center,
-                maxLength: 1,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(counterText: ''),
-              ),
-            ),
+        TextField(
+          controller: _codeController,
+          autofocus: true,
+          textAlign: TextAlign.center,
+          maxLength: 6,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            counterText: '',
+            hintText: '6-digit code',
           ),
         ),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: onVerified,
+          onPressed: widget.loading
+              ? null
+              : () => widget.onVerified(_codeController.text.trim()),
           style: _primaryStyle(full: true),
-          child: const Text('Verify & continue'),
+          child: Text(widget.loading ? 'Verifying...' : 'Verify & continue'),
         ),
+        if (widget.error != null) ...[
+          const SizedBox(height: 12),
+          _AuthError(message: widget.error!),
+        ],
         TextButton(
-          onPressed: () =>
-              _notice(context, 'A new verification code has been sent.'),
+          onPressed: widget.loading ? null : widget.onResend,
           child: const Text('Resend code in 00:27'),
         ),
       ],
     ),
+  );
+}
+
+class _AuthError extends StatelessWidget {
+  const _AuthError({required this.message});
+  final String message;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: const Color(0xffffe9e7),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(message, style: const TextStyle(color: Color(0xff9d2520))),
   );
 }
 
@@ -692,7 +1000,7 @@ class CreateBusinessPage extends StatefulWidget {
     required this.onCreate,
   });
   final VoidCallback onBack;
-  final ValueChanged<bool> onCreate;
+  final VoidCallback onCreate;
   @override
   State<CreateBusinessPage> createState() => _CreateBusinessPageState();
 }
@@ -723,29 +1031,43 @@ class _CreateBusinessPageState extends State<CreateBusinessPage> {
         const SizedBox(height: 7),
         SegmentedButton<bool>(
           segments: const [
-            ButtonSegment(value: false, icon: Icon(Icons.restaurant_rounded), label: Text('Restaurant')),
-            ButtonSegment(value: true, icon: Icon(Icons.storefront_rounded), label: Text('Food Court')),
+            ButtonSegment(
+              value: false,
+              icon: Icon(Icons.restaurant_rounded),
+              label: Text('Restaurant'),
+            ),
+            ButtonSegment(
+              value: true,
+              icon: Icon(Icons.storefront_rounded),
+              label: Text('Food Court'),
+            ),
           ],
           selected: {isFoodCourt},
-          onSelectionChanged: (value) => setState(() => isFoodCourt = value.first),
+          onSelectionChanged: (value) =>
+              setState(() => isFoodCourt = value.first),
         ),
         const SizedBox(height: 10),
-        Text(isFoodCourt ? 'Food courts can manage stalls and assign staff to stalls.' : 'Restaurants manage staff directly. No stalls are required.'),
+        Text(
+          isFoodCourt
+              ? 'Food courts can manage stalls and assign staff to stalls.'
+              : 'Restaurants manage staff directly. No stalls are required.',
+        ),
         const SizedBox(height: 16),
         if (isFoodCourt) const _FormLabel('Number of stalls'),
         if (isFoodCourt) const SizedBox(height: 7),
-        if (isFoodCourt) DropdownButtonFormField<String>(
-          initialValue: '3–5 stalls',
-          items: const [
-            DropdownMenuItem(value: '1–2 stalls', child: Text('1–2 stalls')),
-            DropdownMenuItem(value: '3–5 stalls', child: Text('3–5 stalls')),
-            DropdownMenuItem(value: '6+ stalls', child: Text('6+ stalls')),
-          ],
-          onChanged: (_) {},
-        ),
+        if (isFoodCourt)
+          DropdownButtonFormField<String>(
+            initialValue: '3–5 stalls',
+            items: const [
+              DropdownMenuItem(value: '1–2 stalls', child: Text('1–2 stalls')),
+              DropdownMenuItem(value: '3–5 stalls', child: Text('3–5 stalls')),
+              DropdownMenuItem(value: '6+ stalls', child: Text('6+ stalls')),
+            ],
+            onChanged: (_) {},
+          ),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: () => widget.onCreate(isFoodCourt),
+          onPressed: widget.onCreate,
           style: _primaryStyle(full: true),
           child: const Text('Create my workspace'),
         ),
@@ -818,17 +1140,24 @@ class DashboardPage extends StatelessWidget {
     required this.staffRole,
     required this.access,
     required this.isFoodCourt,
+    required this.businessName,
+    required this.stallName,
+    required this.userName,
+    required this.stallAccess,
     required this.onSection,
     required this.onAddStaff,
     required this.onStaff,
-    required this.onSwitch,
+    required this.onSelectStall,
     required this.onLogout,
   });
-  final String section, access;
+  final String section, access, businessName;
+  final String? stallName, userName;
   final bool isFoodCourt;
+  final List<BusinessAccess> stallAccess;
   final bool staffRole;
   final ValueChanged<String> onSection;
-  final VoidCallback onAddStaff, onStaff, onSwitch, onLogout;
+  final VoidCallback onAddStaff, onStaff, onLogout;
+  final ValueChanged<BusinessAccess> onSelectStall;
   static const items = [
     ('Overview', Icons.grid_view_rounded),
     ('Stalls', Icons.storefront_outlined),
@@ -849,8 +1178,12 @@ class DashboardPage extends StatelessWidget {
       staffRole: staffRole,
       access: access,
       isFoodCourt: isFoodCourt,
+      businessName: businessName,
+      stallName: stallName,
+      userName: userName,
+      stallAccess: stallAccess,
       onSection: onSection,
-      onSwitch: onSwitch,
+      onSelectStall: onSelectStall,
       onLogout: onLogout,
     );
     return Scaffold(
@@ -892,15 +1225,21 @@ class _Sidebar extends StatelessWidget {
     required this.staffRole,
     required this.access,
     required this.isFoodCourt,
+    required this.businessName,
+    required this.stallName,
+    required this.userName,
+    required this.stallAccess,
     required this.onSection,
-    required this.onSwitch,
+    required this.onSelectStall,
     required this.onLogout,
   });
-  final String active, access;
+  final String active, access, businessName;
+  final String? stallName, userName;
   final bool staffRole;
   final bool isFoodCourt;
+  final List<BusinessAccess> stallAccess;
   final ValueChanged<String> onSection;
-  final VoidCallback onSwitch;
+  final ValueChanged<BusinessAccess> onSelectStall;
   final VoidCallback onLogout;
   @override
   Widget build(BuildContext context) => Container(
@@ -917,7 +1256,7 @@ class _Sidebar extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 11),
           child: Text(
-            isFoodCourt ? 'CENTRAL FOOD COURT' : 'ABC RESTAURANT',
+            businessName.toUpperCase(),
             style: TextStyle(
               fontSize: 10,
               color: Color(0xff9aa5b8),
@@ -926,23 +1265,64 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 11),
-        ...(isFoodCourt ? DashboardPage.items : DashboardPage.items.where((e) => e.$1 != 'Stalls')).map(
-          (e) => Padding(
-            padding: const EdgeInsets.only(bottom: 3),
-            child: _SideItem(
-              label: e.$1,
-              icon: e.$2,
-              selected: active == e.$1,
-              onTap: () {
-                onSection(e.$1);
-                if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
-                  Navigator.pop(context);
-                }
-              },
-            ),
+        if (stallName != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(11, 0, 11, 12),
+            child: stallAccess.length > 1
+                ? PopupMenuButton<BusinessAccess>(
+                    onSelected: onSelectStall,
+                    itemBuilder: (context) => stallAccess
+                        .map(
+                          (item) => PopupMenuItem(
+                            value: item,
+                            child: Text('${item.stallName} · ${item.role}'),
+                          ),
+                        )
+                        .toList(),
+                    child: Row(
+                      children: [
+                        Text(
+                          stallName!,
+                          style: const TextStyle(
+                            color: Color(0xffffc36e),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Icon(
+                          Icons.expand_more_rounded,
+                          color: Color(0xffffc36e),
+                        ),
+                      ],
+                    ),
+                  )
+                : Text(
+                    stallName!,
+                    style: const TextStyle(
+                      color: Color(0xffffc36e),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
           ),
-        ),
+        const SizedBox(height: 11),
+        ...(isFoodCourt
+                ? DashboardPage.items
+                : DashboardPage.items.where((e) => e.$1 != 'Stalls'))
+            .map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: _SideItem(
+                  label: e.$1,
+                  icon: e.$2,
+                  selected: active == e.$1,
+                  onTap: () {
+                    onSection(e.$1);
+                    if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
+              ),
+            ),
         const Spacer(),
         Container(
           padding: const EdgeInsets.all(12),
@@ -969,8 +1349,10 @@ class _Sidebar extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Aarav Patel',
+                    Text(
+                      (userName?.trim().isNotEmpty ?? false)
+                          ? userName!.trim()
+                          : 'Your account',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -1074,7 +1456,11 @@ class _DashboardContent extends StatelessWidget {
       return const _Stalls();
     }
     if (section == 'Staff') {
-      return _Staff(isFoodCourt: isFoodCourt, onAdd: onAddStaff, onStaff: onStaff);
+      return _Staff(
+        isFoodCourt: isFoodCourt,
+        onAdd: onAddStaff,
+        onStaff: onStaff,
+      );
     }
     if (section == 'Orders') {
       return const _Orders();
@@ -1666,13 +2052,19 @@ class _StallRow extends StatelessWidget {
 }
 
 class _Staff extends StatelessWidget {
-  const _Staff({required this.isFoodCourt, required this.onAdd, required this.onStaff});
+  const _Staff({
+    required this.isFoodCourt,
+    required this.onAdd,
+    required this.onStaff,
+  });
   final bool isFoodCourt;
   final VoidCallback onAdd, onStaff;
   @override
   Widget build(BuildContext c) => _PageShell(
     title: 'Your team',
-    subtitle: isFoodCourt ? 'People and permissions across Central Food Court.' : 'Roles and permissions for ABC Restaurant.',
+    subtitle: isFoodCourt
+        ? 'People and permissions across Central Food Court.'
+        : 'Roles and permissions for ABC Restaurant.',
     action: FilledButton.icon(
       onPressed: onAdd,
       icon: const Icon(Icons.person_add_alt_1_rounded),
@@ -1706,9 +2098,21 @@ class _Staff extends StatelessWidget {
                 ],
               ),
               const Divider(color: _line),
-              _Member('Vicky', 'Owner', isFoodCourt ? 'All stalls' : 'ABC Restaurant', true, onStaff),
+              _Member(
+                'Vicky',
+                'Owner',
+                isFoodCourt ? 'All stalls' : 'ABC Restaurant',
+                true,
+                onStaff,
+              ),
               const Divider(color: _line),
-              _Member('Rahul', 'Manager', isFoodCourt ? 'Pizza Stall, Burger Stall' : 'ABC Restaurant', true, onStaff),
+              _Member(
+                'Rahul',
+                'Manager',
+                isFoodCourt ? 'Pizza Stall, Burger Stall' : 'ABC Restaurant',
+                true,
+                onStaff,
+              ),
               const Divider(color: _line),
               _Member(
                 'Ajay',
@@ -1718,7 +2122,13 @@ class _Staff extends StatelessWidget {
                 onStaff,
               ),
               const Divider(color: _line),
-              _Member('Kumar', isFoodCourt ? 'Manager' : 'Cashier', isFoodCourt ? 'Burger Stall' : 'ABC Restaurant', false, onStaff),
+              _Member(
+                'Kumar',
+                isFoodCourt ? 'Manager' : 'Cashier',
+                isFoodCourt ? 'Burger Stall' : 'ABC Restaurant',
+                false,
+                onStaff,
+              ),
             ],
           ),
         ),
@@ -1836,7 +2246,12 @@ class _Member extends StatelessWidget {
 }
 
 class AddStaffPage extends StatelessWidget {
-  const AddStaffPage({super.key, required this.isFoodCourt, required this.onBack, required this.onSend});
+  const AddStaffPage({
+    super.key,
+    required this.isFoodCourt,
+    required this.onBack,
+    required this.onSend,
+  });
   final bool isFoodCourt;
   final VoidCallback onBack, onSend;
   @override
@@ -1886,27 +2301,25 @@ class AddStaffPage extends StatelessWidget {
               DropdownButtonFormField<String>(
                 initialValue: 'Manager',
                 items: const [
-                  DropdownMenuItem(
-                    value: 'Manager',
-                    child: Text('Manager'),
-                  ),
+                  DropdownMenuItem(value: 'Manager', child: Text('Manager')),
                   DropdownMenuItem(value: 'Cashier', child: Text('Cashier')),
-                  DropdownMenuItem(
-                    value: 'Kitchen',
-                    child: Text('Kitchen'),
-                  ),
+                  DropdownMenuItem(value: 'Kitchen', child: Text('Kitchen')),
                 ],
                 onChanged: null,
               ),
               if (isFoodCourt) const SizedBox(height: 18),
-              if (isFoodCourt) const Text(
-                'Assigned stalls',
-                style: TextStyle(fontWeight: FontWeight.w700, color: _navy),
-              ),
+              if (isFoodCourt)
+                const Text(
+                  'Assigned stalls',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: _navy),
+                ),
               if (isFoodCourt) const SizedBox(height: 8),
-              if (isFoodCourt) const _AccessCheck(label: 'Pizza Stall', checked: true),
-              if (isFoodCourt) const _AccessCheck(label: 'Burger Stall', checked: true),
-              if (isFoodCourt) const _AccessCheck(label: 'Juice Stall', checked: false),
+              if (isFoodCourt)
+                const _AccessCheck(label: 'Pizza Stall', checked: true),
+              if (isFoodCourt)
+                const _AccessCheck(label: 'Burger Stall', checked: true),
+              if (isFoodCourt)
+                const _AccessCheck(label: 'Juice Stall', checked: false),
               const SizedBox(height: 22),
               FilledButton.icon(
                 onPressed: onSend,
@@ -1946,7 +2359,11 @@ class _AccessCheckState extends State<_AccessCheck> {
 }
 
 class StaffDetailsPage extends StatelessWidget {
-  const StaffDetailsPage({super.key, required this.isFoodCourt, required this.onBack});
+  const StaffDetailsPage({
+    super.key,
+    required this.isFoodCourt,
+    required this.onBack,
+  });
   final bool isFoodCourt;
   final VoidCallback onBack;
   @override
@@ -2075,21 +2492,39 @@ class StaffDetailsPage extends StatelessWidget {
               const SizedBox(height: 22),
               Text('Roles & access', style: Theme.of(c).textTheme.titleLarge),
               const SizedBox(height: 5),
-              Text(isFoodCourt ? 'Rahul can switch only between the assigned stalls below.' : 'Rahul is assigned to ABC Restaurant as Manager.'),
+              Text(
+                isFoodCourt
+                    ? 'Rahul can switch only between the assigned stalls below.'
+                    : 'Rahul is assigned to ABC Restaurant as Manager.',
+              ),
               const SizedBox(height: 14),
-              if (isFoodCourt) const _RoleAccess(
-                stall: 'Pizza Stall',
-                role: 'Manager',
-                details: 'Orders, preparation board, menu availability',
-              ),
+              if (isFoodCourt)
+                const _RoleAccess(
+                  stall: 'Pizza Stall',
+                  role: 'Manager',
+                  details: 'Orders, preparation board, menu availability',
+                ),
               if (isFoodCourt) const SizedBox(height: 11),
-              if (isFoodCourt) const _RoleAccess(
-                stall: 'Burger Stall',
-                role: 'Staff',
-                details: 'Orders, preparation board, menu availability',
-              ),
-              if (!isFoodCourt) const _RoleAccess(stall: 'ABC Restaurant', role: 'Manager', details: 'Restaurant operations, menu and orders'),
-              if (isFoodCourt) const Padding(padding: EdgeInsets.only(top: 14), child: Text('Juice Stall is not assigned to Rahul and will not appear in his stall selector.', style: TextStyle(color: _muted))),
+              if (isFoodCourt)
+                const _RoleAccess(
+                  stall: 'Burger Stall',
+                  role: 'Staff',
+                  details: 'Orders, preparation board, menu availability',
+                ),
+              if (!isFoodCourt)
+                const _RoleAccess(
+                  stall: 'ABC Restaurant',
+                  role: 'Manager',
+                  details: 'Restaurant operations, menu and orders',
+                ),
+              if (isFoodCourt)
+                const Padding(
+                  padding: EdgeInsets.only(top: 14),
+                  child: Text(
+                    'Juice Stall is not assigned to Rahul and will not appear in his stall selector.',
+                    style: TextStyle(color: _muted),
+                  ),
+                ),
               const SizedBox(height: 22),
               Text('Recent activity', style: Theme.of(c).textTheme.titleLarge),
               const SizedBox(height: 12),
