@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_config.dart';
@@ -19,6 +23,8 @@ import 'features/menu/menu_models.dart';
 import 'features/menu/menu_service.dart';
 import 'features/tables/dining_table.dart';
 import 'features/tables/table_service.dart';
+import 'features/qr/qr_service.dart';
+import 'features/qr/qr_token.dart';
 
 part 'core/router/app_router.dart';
 part 'core/widgets/shared_widgets.dart';
@@ -32,6 +38,7 @@ part 'features/stalls/dashboard_page.dart';
 part 'features/stalls/stall_management_page.dart';
 part 'features/menu/menu_management_page.dart';
 part 'features/tables/table_management_page.dart';
+part 'features/qr/qr_management_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
