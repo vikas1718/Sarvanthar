@@ -10,6 +10,9 @@ dependencies:
   flutter:
     sdk: flutter
   image_picker: ^1.2.3
+  pdf: ^3.11.3
+  printing: ^5.15.0
+  qr_flutter: ^4.1.0
   supabase_flutter: ^2.16.0
 
 dev_dependencies:

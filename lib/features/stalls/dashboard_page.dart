@@ -82,6 +82,7 @@ class DashboardPage extends StatelessWidget {
               staffRole: staffRole,
               isFoodCourt: isFoodCourt,
               businessId: businessId,
+              businessName: businessName,
               currentRole: currentRole,
               selectedStallId: selectedStallId,
               onSection: onSection,
@@ -195,6 +196,11 @@ class _Sidebar extends StatelessWidget {
                         'kitchen',
                       ].contains(access.split(' ').first.toLowerCase())) &&
                   (item.$1 != 'Tables' ||
+                      [
+                        'owner',
+                        'manager',
+                      ].contains(access.split(' ').first.toLowerCase())) &&
+                  (item.$1 != 'QR Codes' ||
                       [
                         'owner',
                         'manager',
@@ -332,6 +338,7 @@ class _DashboardContent extends StatelessWidget {
     required this.staffRole,
     required this.isFoodCourt,
     required this.businessId,
+    required this.businessName,
     required this.currentRole,
     required this.selectedStallId,
     required this.onSection,
@@ -342,6 +349,7 @@ class _DashboardContent extends StatelessWidget {
   final bool staffRole;
   final bool isFoodCourt;
   final String businessId;
+  final String businessName;
   final String currentRole;
   final String? selectedStallId;
   final ValueChanged<String> onSection;
@@ -374,6 +382,15 @@ class _DashboardContent extends StatelessWidget {
     }
     if (section == 'Tables' && ['owner', 'manager'].contains(currentRole)) {
       return TableManagementPage(businessId: businessId);
+    }
+    if (section == 'QR Codes' && ['owner', 'manager'].contains(currentRole)) {
+      return QrManagementPage(
+        businessId: businessId,
+        businessName: businessName,
+        isFoodCourt: isFoodCourt,
+        role: currentRole,
+        stallId: selectedStallId,
+      );
     }
     if (section == 'Orders') {
       return const _Orders();
