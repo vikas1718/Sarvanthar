@@ -1,98 +1,152 @@
 # ServeFlow
 
-ServeFlow is a cross-platform Flutter application for managing restaurants and food courts. It provides a single workspace for owners and staff to manage business details, stalls, team access, menus, dining tables, and customer-facing QR codes.
+Multi-tenant restaurant and food-court management dashboard. Flutter front end, Supabase (Postgres + RLS) back end.
 
-## Features
+One deployment serves many businesses. A business is either a **restaurant** (single kitchen, staff attached directly to the business) or a **food court** (multiple stalls, staff attached to a stall). Access, menus, tables, and QR codes are all scoped by that distinction.
 
-- Email and password authentication with session restoration
-- Restaurant and food-court workspace creation
-- Role-based access for owners, managers, kitchen staff, cashiers, and general staff
-- Staff invitations and stall-specific assignments
-- Business profile and stall management
-- Menu categories, items, options, availability, and image uploads
-- Dining-table management
-- QR token generation, preview, PDF export, and printing
-- Multi-business and multi-stall workspace selection
-- Supabase Row Level Security (RLS) and protected database functions
+## Status
 
-## Tech stack
-
-- Flutter and Dart
-- Supabase Auth, PostgreSQL, Storage, and RLS
-- `image_picker` for menu images
-- `qr_flutter` for QR code rendering
-- `pdf` and `printing` for printable QR materials
-
-## Project structure
-
-```text
-lib/
-|-- core/                 # App configuration, routing, and shared widgets
-|-- features/
-|   |-- access/           # Workspace and role selection
-|   |-- auth/             # Authentication and invitations
-|   |-- business/         # Business profile management
-|   |-- menu/             # Menu categories, items, and options
-|   |-- qr/               # QR token management and printing
-|   |-- staff/            # Staff roles and invitations
-|   |-- stalls/           # Food-court stalls and dashboard
-|   `-- tables/           # Dining-table management
-`-- main.dart             # Application entry point
-
-supabase/
-|-- migrations/           # Database schema, RLS policies, and RPC functions
-`-- config.toml            # Local Supabase configuration
-```
+| Area | State |
+|---|---|
+| Auth, business creation, business/stall selection | Implemented |
+| Business profile (logo, contact, currency, tax) | Implemented |
+| Stall management (food courts) | Implemented |
+| Staff management + invitations | Implemented |
+| Menu management (categories, items, options, images) | Implemented |
+| Table management (dine-in) | Implemented |
+| QR codes (generate, print, regenerate) | Implemented |
+| Orders | **Static mock** — no orders tables exist yet |
+| Payments, Reports, Settings | **Not started** — nav entries render a placeholder |
+| Customer-facing scan destination | **Not started** — separate Next.js project |
 
 ## Getting started
 
-### Prerequisites
+```bash
+flutter pub get
+```
 
-- Flutter SDK compatible with Dart `^3.13.0`
-- A Supabase project, or the Supabase CLI and Docker for local development
+The app reads its Supabase credentials at compile time and refuses to start without them:
 
-### Setup
+```bash
+flutter run \
+  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
 
-1. Clone the repository and install dependencies:
+| Define | Required | Default |
+|---|---|---|
+| `SUPABASE_URL` | yes | — |
+| `SUPABASE_PUBLISHABLE_KEY` | yes | — |
+| `QR_SCAN_BASE_URL` | no | `https://scan.serveflow.app` |
 
-   ```bash
-   flutter pub get
-   ```
+`QR_SCAN_BASE_URL` is the origin printed into QR codes. It points at a placeholder until the customer-facing app exists. Only the origin changes when that ships, so codes printed today keep working.
 
-2. Apply the migrations in `supabase/migrations` to your Supabase project. With a linked Supabase CLI project, run:
+Requires Dart SDK `^3.13.0`.
 
-   ```bash
-   supabase db push
-   ```
+## Architecture
 
-3. Enable the Email provider in Supabase Authentication. For local testing, email confirmation may be disabled; enable it for production.
+**The whole UI is one Dart library.** `lib/main.dart` declares every page as a `part`, and each page file opens with `part of '../../main.dart'`. Services and models are ordinary imports; pages are not.
 
-4. Run the application with your Supabase credentials:
+Consequences worth knowing before you add a file:
 
-   ```bash
-   flutter run \
-     --dart-define=SUPABASE_URL=https://your-project.supabase.co \
-     --dart-define=SUPABASE_PUBLISHABLE_KEY=your-publishable-key \
-     --dart-define=QR_SCAN_BASE_URL=https://your-scan-app.example.com
-   ```
+- Every `_private` name shares a single namespace across all page files. A new `_Panel` in one feature collides with `_Panel` in another. Prefix new private widgets by feature (`_QrTargetCard`, `_MenuRow`).
+- Shared chrome and design tokens live in `lib/core/widgets/shared_widgets.dart` (`_navy`, `_amber`, `_cream`, `_line`, `_muted`, `_PageShell`, `_Panel`, `_primaryStyle`, `_notice`).
+- A new page needs both an `import` for its service/model files and a `part` directive in `main.dart`.
 
-   `QR_SCAN_BASE_URL` is optional and defaults to `https://scan.serveflow.app`. It should point to the separate customer-facing application that resolves scanned QR tokens.
+```
+lib/
+  core/
+    config/app_config.dart        compile-time defines
+    router/app_router.dart        page enum + auth-driven navigation
+    widgets/shared_widgets.dart   design tokens, shared chrome
+  features/
+    access/      business + stall selection, role resolution
+    auth/        sign in / sign up
+    business/    business creation, profile
+    stalls/      dashboard shell, stall management
+    staff/       staff list, invitations
+    menu/        categories, items, options
+    tables/      dine-in tables
+    qr/          QR token generation and printing
+```
 
-## Security and access model
+Data access is a thin service class per feature (`QrService`, `TableService`, …) wrapping `SupabaseClient`. Writes that need authorization go through Postgres RPCs, not direct table writes.
 
-Owners have business-wide access. Restaurant staff belong directly to a business, while food-court staff are assigned to individual stalls. Database access is enforced through Supabase RLS policies and security-definer RPC functions, rather than relying only on client-side checks.
+## Roles and permissions
+
+Roles: `owner`, `manager`, `kitchen`, `cashier`, `staff`. One owner per business, enforced by a partial unique index.
+
+Sidebar visibility, as implemented:
+
+| Section | owner | manager | kitchen | cashier | staff |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Overview | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Business Profile | ✅ | — | — | — | — |
+| Stalls *(food court only)* | ✅ | — | — | — | — |
+| Staff | ✅ | — | — | — | — |
+| Menu | ✅ | ✅ | ✅ | — | — |
+| Tables | ✅ | ✅ | — | — | — |
+| QR Codes | ✅ | ✅ | — | — | — |
+| Orders / Payments / Reports / Settings | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+Those last four are visible to everyone but render a mock or a placeholder.
+
+**Client-side gating is cosmetic.** Every rule above is enforced again in Postgres via RLS policies and `security definer` RPCs that check `auth.uid()`. Helpers live in the `private` schema: `is_business_owner`, `has_business_access`, `has_stall_access`, `can_manage_menu`, `can_manage_tables`, `can_manage_qr_tokens`.
+
+One subtlety if you add an RLS policy that calls a `private` helper: policy expressions evaluate with the *querying* role's privileges, so that helper needs `grant execute ... to authenticated`. Helpers called only from inside `security definer` bodies don't.
+
+## Database
+
+Migrations are applied with the Supabase CLI:
+
+```bash
+supabase db push
+```
+
+```
+supabase/
+  migrations/   applied, in timestamp order
+  proposals/    written and reviewed, NOT applied
+```
+
+`supabase/proposals/` is a deliberate convention: schema changes are drafted there with a `-- REVIEW ONLY` header, reviewed, then moved into `migrations/` unchanged and pushed. Don't apply a proposal without approval, and don't edit a migration that has already been applied — write a corrective one.
+
+`anon` is locked out of the `public` schema wholesale (`revoke all on all tables/functions ... from anon`). Note that Supabase's default privileges grant *new* public-schema tables to `anon`, so a new table needs its own explicit `revoke` — an earlier blanket revoke does not cover it.
+
+## QR codes
+
+Owners and managers generate one QR per dine-in table, and per stall (food court) or per business counter (restaurant). Codes render on screen, print, or download as a vector PDF. Regenerating mints a new code and **invalidates the old one immediately** — anything already printed stops working.
+
+Tokens are 128 bits of `gen_random_bytes` hex, unrelated to any database id, so a scan URL discloses nothing about the table or stall. The alphabet is lowercase-only (`^[a-f0-9]{32}$`); a hand-transcribed uppercase URL will not resolve.
+
+### `resolve_qr_token` is the only anon-executable function in this project
+
+```sql
+grant execute on function public.resolve_qr_token(text) to anon, authenticated;
+```
+
+A customer scanning a printed code is anonymous by definition and must learn which business, stall, and table they're at before anything else can happen. There is no session to authenticate, and `enable_anonymous_sign_ins = false` rules out throwaway signups.
+
+It is read-only, `security definer` (so `anon` holds no direct privilege on `qr_tokens` — a direct table read returns `permission denied`), regex-gates its input before any query, and fails closed on archived or deactivated businesses, stalls, and tables. It returns exactly what the person holding the physical code can already see, plus the ids the customer app needs to load a menu.
+
+Resolution failures are deliberately distinguishable, so support can tell a reissued code from a bad one:
+
+| Message | Cause |
+|---|---|
+| `QR code is not valid` | malformed, or no such token |
+| `QR code has been replaced` | token was retired by regeneration |
+| `QR code is no longer active` | token is live, but its target is archived or deactivated |
+
+**Before launch:** add a rate limit to this endpoint. It is the only unauthenticated entry point in the system.
 
 ## Testing
 
-Run Flutter's static analysis and tests with:
+There is no test harness — no `test/` directory, no widget or integration tests.
+
+Backend behaviour has been verified by exercising the RPCs against a real project with disposable fixtures: token generation, regeneration and revocation, anonymous resolve, malformed and nonexistent input, cross-business rejection, per-role denial, and archived-target refusal.
+
+The Flutter UI is compile-checked only. QR image rendering and the PDF print/download paths have never been executed. Verify those manually on a real device after touching them.
 
 ```bash
 flutter analyze
-flutter test
 ```
-
-See [AUTH_TESTING.md](AUTH_TESTING.md) for the manual authentication and authorization test checklist.
-
-## Supported platforms
-
-The repository contains Flutter targets for Android, iOS, web, Windows, macOS, and Linux.
