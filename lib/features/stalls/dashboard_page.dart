@@ -204,6 +204,13 @@ class _Sidebar extends StatelessWidget {
                       [
                         'owner',
                         'manager',
+                      ].contains(access.split(' ').first.toLowerCase())) &&
+                  (item.$1 != 'Orders' ||
+                      [
+                        'owner',
+                        'manager',
+                        'kitchen',
+                        'cashier',
                       ].contains(access.split(' ').first.toLowerCase())),
             )
             .map(
@@ -392,8 +399,13 @@ class _DashboardContent extends StatelessWidget {
         stallId: selectedStallId,
       );
     }
-    if (section == 'Orders') {
-      return const _Orders();
+    if (section == 'Orders' &&
+        ['owner', 'manager', 'kitchen', 'cashier'].contains(currentRole)) {
+      return KitchenPage(
+        businessId: businessId,
+        stallId: selectedStallId,
+        role: currentRole,
+      );
     }
     return _Restricted(title: section, staffRole: staffRole);
   }
@@ -818,6 +830,8 @@ class _Panel extends StatelessWidget {
   );
 }
 
+// TODO: Remove this legacy visual placeholder after the dashboard redesign.
+// ignore: unused_element
 class _Orders extends StatelessWidget {
   const _Orders();
   @override
