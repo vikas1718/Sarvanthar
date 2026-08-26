@@ -93,6 +93,10 @@ flutter test
 
 See [AUTH_TESTING.md](AUTH_TESTING.md) for the manual authentication and authorization test checklist.
 
+## Pre-launch checklist
+
+- Keep migration `20260824000100_customer_public_menu_and_orders.sql` byte-for-byte identical in the Flutter and Customer repositories. The Customer repository remains the source of truth; never edit only one copy.
+
 ## Supported platforms
 
 The repository contains Flutter targets for Android, iOS, web, Windows, macOS, and Linux.
