@@ -56,7 +56,7 @@ class _CreateBusinessPageState extends State<CreateBusinessPage> {
         ),
         const SizedBox(height: 7),
         const Text(
-          'Use 6â€“20 uppercase letters or numbers. Staff can use this code to identify your business.',
+          'Use 6-20 uppercase letters or numbers. Staff can use this code to identify your business.',
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: 16),
@@ -90,15 +90,15 @@ class _CreateBusinessPageState extends State<CreateBusinessPage> {
         if (isFoodCourt) const SizedBox(height: 7),
         if (isFoodCourt)
           DropdownButtonFormField<String>(
-            initialValue: '3â€“5 stalls',
+            initialValue: '3-5 stalls',
             items: const [
               DropdownMenuItem(
-                value: '1â€“2 stalls',
-                child: Text('1â€“2 stalls'),
+                value: '1-2 stalls',
+                child: Text('1-2 stalls'),
               ),
               DropdownMenuItem(
-                value: '3â€“5 stalls',
-                child: Text('3â€“5 stalls'),
+                value: '3-5 stalls',
+                child: Text('3-5 stalls'),
               ),
               DropdownMenuItem(value: '6+ stalls', child: Text('6+ stalls')),
             ],
@@ -114,7 +114,7 @@ class _CreateBusinessPageState extends State<CreateBusinessPage> {
                   if (name.isEmpty ||
                       !RegExp(r'^[A-Z0-9]{6,20}$').hasMatch(code)) {
                     setState(
-                      () => _validationError = 'Enter a business name and a unique 6â€“20 character code.',
+                      () => _validationError = 'Enter a business name and a unique 6-20 character code.',
                     );
                     return;
                   }

@@ -71,31 +71,42 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
         email: draft.email,
         phone: draft.phone,
       );
+      // Email the teammate a secure passwordless sign-in link. When they open
+      // it and sign in, their role is applied automatically by email match.
+      String? emailError;
+      if (draft.email != null) {
+        try {
+          await service.sendInvitationEmail(draft.email!);
+        } catch (_) {
+          emailError = 'delivery failed';
+        }
+      }
       if (!mounted) return;
       setState(() => busy = false);
+      final emailed = draft.email != null && emailError == null;
+      final link = 'serveflow://invite?token=${created.token}';
+      final message = emailed
+          ? 'We emailed a secure sign-in link to ${draft.email}. When they open it and sign in, their ${draft.role} access is applied automatically.'
+          : draft.email != null
+          ? 'The invitation is ready, but we could not email the sign-in link automatically. Share this secure link with ${draft.email} so they can sign in and get ${draft.role} access.'
+          : 'Share this secure link with your teammate so they can sign in and get ${draft.role} access.';
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Invitation created'),
+          title: Text(emailed ? 'Invitation sent' : 'Invitation created'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Automatic delivery is not configured yet. Copy this secure invitation link and send it manually.',
-              ),
+              Text(message),
               const SizedBox(height: 12),
-              SelectableText('serveflow://invite?token=${created.token}'),
+              SelectableText(link),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Clipboard.setData(
-                  ClipboardData(
-                    text: 'serveflow://invite?token=${created.token}',
-                  ),
-                );
+                Clipboard.setData(ClipboardData(text: link));
                 _notice(context, 'Invite link copied.');
               },
               child: const Text('Copy invite link'),
@@ -200,7 +211,7 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
                           contentPadding: EdgeInsets.zero,
                           title: Text(m.name),
                           subtitle: Text(
-                            '${m.role} Â· ${m.stallName ?? 'Business-wide'}\n${m.email ?? m.phone ?? ''}',
+                            '${m.role} · ${m.stallName ?? 'Business-wide'}\n${m.email ?? m.phone ?? ''}',
                           ),
                           trailing: TextButton(
                             onPressed: busy ? null : () => disable(m),
@@ -226,7 +237,7 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
                       contentPadding: EdgeInsets.zero,
                       title: Text(i.email ?? i.phone ?? 'Invitation'),
                       subtitle: Text(
-                        '${i.role} Â· ${i.stallName ?? 'Business-wide'}',
+                        '${i.role} · ${i.stallName ?? 'Business-wide'}',
                       ),
                       trailing: TextButton(
                         onPressed: busy ? null : () => revoke(i),

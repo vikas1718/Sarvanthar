@@ -158,6 +158,17 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       });
     }
     try {
+      // A teammate invited by email arrives here after opening their sign-in
+      // link. Apply any invitation addressed to their verified email so their
+      // role is granted automatically. Best-effort: ignored when none matches
+      // or the RPC is not deployed yet. Skipped when redeeming a typed token.
+      if (pendingInvitationToken == null) {
+        try {
+          await StaffService(_supabase).redeemCurrentUserInvitation();
+        } catch (_) {
+          // No matching invitation, or the RPC isn't deployed yet — ignore.
+        }
+      }
       final profile = await _supabase
           .from('profiles')
           .select('full_name')
