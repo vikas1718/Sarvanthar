@@ -15,7 +15,7 @@ One deployment serves many businesses. A business is either a **restaurant** (si
 | Menu management (categories, items, options, images) | Implemented |
 | Table management (dine-in) | Implemented |
 | QR codes (generate, print, regenerate) | Implemented |
-| Orders | **Static mock** — no orders tables exist yet |
+| Kitchen orders (Realtime read + status workflow) | Implemented |
 | Payments, Reports, Settings | **Not started** — nav entries render a placeholder |
 | Customer-facing scan destination | **Not started** — separate Next.js project |
 
@@ -68,6 +68,7 @@ lib/
     menu/        categories, items, options
     tables/      dine-in tables
     qr/          QR token generation and printing
+    kitchen/     live order queue and status updates
 ```
 
 Data access is a thin service class per feature (`QrService`, `TableService`, …) wrapping `SupabaseClient`. Writes that need authorization go through Postgres RPCs, not direct table writes.
@@ -87,9 +88,11 @@ Sidebar visibility, as implemented:
 | Menu | ✅ | ✅ | ✅ | — | — |
 | Tables | ✅ | ✅ | — | — | — |
 | QR Codes | ✅ | ✅ | — | — | — |
-| Orders / Payments / Reports / Settings | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Orders | ✅ | ✅ | ✅ | ✅ | — |
+| Payments / Reports / Settings | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-Those last four are visible to everyone but render a mock or a placeholder.
+Payments, Reports, and Settings currently render placeholders. Orders opens the
+Realtime Kitchen queue for Owner, Manager, Kitchen, and Cashier roles.
 
 **Client-side gating is cosmetic.** Every rule above is enforced again in Postgres via RLS policies and `security definer` RPCs that check `auth.uid()`. Helpers live in the `private` schema: `is_business_owner`, `has_business_access`, `has_stall_access`, `can_manage_menu`, `can_manage_tables`, `can_manage_qr_tokens`.
 
@@ -150,3 +153,12 @@ The Flutter UI is compile-checked only. QR image rendering and the PDF print/dow
 ```bash
 flutter analyze
 ```
+See [AUTH_TESTING.md](AUTH_TESTING.md) for the manual authentication and authorization test checklist.
+
+## Pre-launch checklist
+
+- Keep migration `20260824000100_customer_public_menu_and_orders.sql` byte-for-byte identical in the Flutter and Customer repositories. The Customer repository remains the source of truth; never edit only one copy.
+
+## Supported platforms
+
+The repository contains Flutter targets for Android, iOS, web, Windows, macOS, and Linux.

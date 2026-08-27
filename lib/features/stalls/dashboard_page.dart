@@ -153,7 +153,7 @@ class _Sidebar extends StatelessWidget {
                           (item) => PopupMenuItem(
                             value: item,
                             child: Text(
-                              '${item.stallName} Ãƒâ€šÃ‚Â· ${item.role}',
+                              '${item.stallName} · ${item.role}',
                             ),
                           ),
                         )
@@ -204,6 +204,13 @@ class _Sidebar extends StatelessWidget {
                       [
                         'owner',
                         'manager',
+                      ].contains(access.split(' ').first.toLowerCase())) &&
+                  (item.$1 != 'Orders' ||
+                      [
+                        'owner',
+                        'manager',
+                        'kitchen',
+                        'cashier',
                       ].contains(access.split(' ').first.toLowerCase())),
             )
             .map(
@@ -392,8 +399,13 @@ class _DashboardContent extends StatelessWidget {
         stallId: selectedStallId,
       );
     }
-    if (section == 'Orders') {
-      return const _Orders();
+    if (section == 'Orders' &&
+        ['owner', 'manager', 'kitchen', 'cashier'].contains(currentRole)) {
+      return KitchenPage(
+        businessId: businessId,
+        stallId: selectedStallId,
+        role: currentRole,
+      );
     }
     return _Restricted(title: section, staffRole: staffRole);
   }
@@ -471,11 +483,11 @@ class _Overview extends StatelessWidget {
   Widget build(BuildContext c) => _PageShell(
     title: staffRole ? 'Good afternoon, Aarav.' : 'A clear view of service.',
     subtitle: staffRole
-        ? 'Kitchen access ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢ Chaat & Co. and South Bowl'
-        : 'Sunday, 16 August  ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¢  The Courtyard Food Hall',
+        ? 'Kitchen access • Chaat & Co. and South Bowl'
+        : 'Sunday, 16 August  •  The Courtyard Food Hall',
     action: OutlinedButton.icon(
       onPressed: () =>
-          _notice(c, 'Showing todayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s service snapshot.'),
+          _notice(c, "Showing today's service snapshot."),
       icon: const Icon(Icons.calendar_today_outlined, size: 17),
       label: const Text('Today'),
     ),
@@ -487,8 +499,8 @@ class _Overview extends StatelessWidget {
             final two = box.maxWidth > 690;
             final cards = [
               _Metric(
-                'ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹18,460',
-                'TodayÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢s sales',
+                '₹18,460',
+                "Today's sales",
                 '+12.4%',
                 Icons.account_balance_wallet_outlined,
               ),
@@ -714,9 +726,9 @@ class _RecentOrders extends StatelessWidget {
         ),
         const Divider(color: _line),
         ...[
-          ('#TC-1048', 'South Bowl', 'ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹420', 'Preparing'),
-          ('#TC-1047', 'Chaat & Co.', 'ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹265', 'Ready'),
-          ('#TC-1046', 'Melt House', 'ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¹510', 'New'),
+          ('#TC-1048', 'South Bowl', '₹420', 'Preparing'),
+          ('#TC-1047', 'Chaat & Co.', '₹265', 'Ready'),
+          ('#TC-1046', 'Melt House', '₹510', 'New'),
         ].map(
           (r) => Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -818,6 +830,8 @@ class _Panel extends StatelessWidget {
   );
 }
 
+// TODO: Remove this legacy visual placeholder after the dashboard redesign.
+// ignore: unused_element
 class _Orders extends StatelessWidget {
   const _Orders();
   @override
@@ -842,7 +856,7 @@ class _Orders extends StatelessWidget {
           OutlinedButton(
             onPressed: () => _notice(
               c,
-              'WeÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll let you know when the order board is available.',
+              "We'll let you know when the order board is available.",
             ),
             child: const Text('Coming soon'),
           ),
@@ -887,7 +901,7 @@ class _Restricted extends StatelessWidget {
               Text(
                 staffRole
                     ? 'Your current role does not include this workspace. Ask the owner if you need more access.'
-                    : 'WeÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢re shaping this part of ServeFlow next. Your current workspace stays exactly as it is.',
+                    : "We're shaping this part of ServeFlow next. Your current workspace stays exactly as it is.",
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 15),
@@ -896,7 +910,7 @@ class _Restricted extends StatelessWidget {
                   c,
                   staffRole
                       ? 'Access request recorded for the workspace owner.'
-                      : 'YouÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ll be notified when this workspace is ready.',
+                      : "You'll be notified when this workspace is ready.",
                 ),
                 child: Text(staffRole ? 'Request access' : 'Notify me'),
               ),

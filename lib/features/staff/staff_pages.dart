@@ -34,7 +34,7 @@ class AddStaffPage extends StatelessWidget {
                 style: Theme.of(c).textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
-              const Text('Theyâ€™ll receive a secure invitation by SMS.'),
+              const Text("They'll receive a secure invitation by email."),
               const SizedBox(height: 30),
               const _FormLabel('Full name'),
               const SizedBox(height: 7),

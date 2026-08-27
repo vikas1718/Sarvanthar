@@ -25,6 +25,8 @@ import 'features/tables/dining_table.dart';
 import 'features/tables/table_service.dart';
 import 'features/qr/qr_service.dart';
 import 'features/qr/qr_token.dart';
+import 'features/kitchen/kitchen_order.dart';
+import 'features/kitchen/kitchen_service.dart';
 
 part 'core/router/app_router.dart';
 part 'core/widgets/shared_widgets.dart';
@@ -39,6 +41,7 @@ part 'features/stalls/stall_management_page.dart';
 part 'features/menu/menu_management_page.dart';
 part 'features/tables/table_management_page.dart';
 part 'features/qr/qr_management_page.dart';
+part 'features/kitchen/kitchen_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

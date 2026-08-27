@@ -76,7 +76,7 @@ class AccessPage extends StatelessWidget {
         const SizedBox(height: 14),
         _AccessChoice(
           icon: Icons.badge_outlined,
-          title: 'Iâ€™m joining a team',
+          title: "I'm joining a team",
           detail: 'Use the invitation from your restaurant manager.',
           button: 'Use staff invitation',
           onTap: onInvitation,
