@@ -57,6 +57,21 @@ class StaffService {
     'revoke_staff_invitation',
     params: {'p_business_id': businessId, 'p_invitation_id': invitationId},
   );
+
+  /// Emails an invited teammate a secure passwordless sign-in link
+  /// (Supabase magic link / OTP) addressed to [email].
+  ///
+  /// When they open the link and sign in, [redeemCurrentUserInvitation] grants
+  /// the role the invitation carries, matched by their verified email address.
+  Future<void> sendInvitationEmail(String email) =>
+      _client.auth.signInWithOtp(email: email, shouldCreateUser: true);
+
+  /// Applies any pending invitation addressed to the signed-in user's email,
+  /// granting the role it carries. Safe to call on every sign-in: it does
+  /// nothing when no matching invitation exists.
+  Future<void> redeemCurrentUserInvitation() =>
+      _client.rpc('redeem_current_staff_invitation');
+
   Future<void> disable(String businessId, StaffMember member) =>
       member.scope == 'business'
       ? _client.rpc(
