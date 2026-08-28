@@ -1,3 +1,5 @@
+flutter run -d web-server --web-port 8080 --dart-define=SUPABASE_URL=https://hynvzfqftvsqqxaaynep.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_KEY
+
 # ServeFlow
 
 Multi-tenant restaurant and food-court management dashboard. Flutter front end, Supabase (Postgres + RLS) back end.
