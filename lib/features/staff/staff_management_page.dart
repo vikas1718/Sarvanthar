@@ -71,46 +71,17 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
         email: draft.email,
         phone: draft.phone,
       );
-      // Email the teammate a secure passwordless sign-in link. When they open
-      // it and sign in, their role is applied automatically by email match.
-      String? emailError;
-      if (draft.email != null) {
-        try {
-          await service.sendInvitationEmail(draft.email!);
-        } catch (_) {
-          emailError = 'delivery failed';
-        }
-      }
       if (!mounted) return;
       setState(() => busy = false);
-      final emailed = draft.email != null && emailError == null;
-      final link = 'serveflow://invite?token=${created.token}';
-      final message = emailed
-          ? 'We emailed a secure sign-in link to ${draft.email}. When they open it and sign in, their ${draft.role} access is applied automatically.'
-          : draft.email != null
-          ? 'The invitation is ready, but we could not email the sign-in link automatically. Share this secure link with ${draft.email} so they can sign in and get ${draft.role} access.'
-          : 'Share this secure link with your teammate so they can sign in and get ${draft.role} access.';
+      final message = draft.email != null
+          ? 'The invitation is ready for ${draft.email}. Ask them to choose “I’m joining a team”, enter their email, password, and your business code, then verify the six-digit email code.'
+          : 'The invitation is ready. Staff must join with their email, password, business code, and a six-digit email code.';
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(emailed ? 'Invitation sent' : 'Invitation created'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(message),
-              const SizedBox(height: 12),
-              SelectableText(link),
-            ],
-          ),
+          title: const Text('Invitation created'),
+          content: Text(message),
           actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: link));
-                _notice(context, 'Invite link copied.');
-              },
-              child: const Text('Copy invite link'),
-            ),
             FilledButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Done'),

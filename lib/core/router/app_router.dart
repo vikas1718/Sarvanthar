@@ -19,6 +19,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   List<BusinessAccess> availableAccess = const [];
   BusinessAccess? selectedAccess;
   String? pendingInvitationToken;
+  _StaffJoinAttempt? pendingStaffJoin;
   StreamSubscription<AuthState>? _authSubscription;
 
   SupabaseClient get _supabase => Supabase.instance.client;
@@ -60,7 +61,6 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     });
     try {
       await _authService.signIn(email, password);
-      await _loadAccess();
     } on AuthException catch (_) {
       if (mounted) {
         setState(
@@ -85,9 +85,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     });
     try {
       final response = await _authService.createAccount(email, password);
-      if (response.session != null) {
-        await _loadAccess();
-      } else if (mounted) {
+      if (response.session == null && mounted) {
         setState(() {
           page = AppPage.login;
           authError = 'Account created. Confirm your email, then sign in.';
@@ -146,6 +144,71 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     }
   }
 
+  Future<void> _startStaffJoin(
+    String email,
+    String password,
+    String businessCode,
+  ) async {
+    setState(() {
+      loadingAccess = true;
+      authError = null;
+    });
+    try {
+      await _authService.sendEmailOtp(email);
+      if (!mounted) return;
+      setState(() {
+        pendingStaffJoin = _StaffJoinAttempt(
+          email: email,
+          password: password,
+          businessCode: businessCode,
+        );
+        loadingAccess = false;
+        page = AppPage.staffOtp;
+      });
+    } on AuthException catch (_) {
+      if (mounted) {
+        setState(() {
+          loadingAccess = false;
+          authError = 'We could not send a verification code. Please try again.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          loadingAccess = false;
+          authError = 'Connection problem. Please try again.';
+        });
+      }
+    }
+  }
+
+  Future<void> _verifyStaffOtp(String code) async {
+    final attempt = pendingStaffJoin;
+    if (attempt == null) return;
+    setState(() {
+      loadingAccess = true;
+      authError = null;
+    });
+    try {
+      await _authService.verifyEmailOtp(attempt.email, code);
+      // The auth-state listener completes the server-side invitation redemption.
+    } on AuthException catch (_) {
+      if (mounted) {
+        setState(() {
+          loadingAccess = false;
+          authError = 'That verification code is invalid or has expired.';
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          loadingAccess = false;
+          authError = 'Connection problem. Please try again.';
+        });
+      }
+    }
+  }
+
   Future<void> _loadAccess() async {
     if (widget.initializationError != null ||
         _supabase.auth.currentSession == null) {
@@ -162,10 +225,23 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       // link. Apply any invitation addressed to their verified email so their
       // role is granted automatically. Best-effort: ignored when none matches
       // or the RPC is not deployed yet. Skipped when redeeming a typed token.
-      if (pendingInvitationToken == null) {
+      if (pendingStaffJoin != null) {
         try {
-          await StaffService(_supabase).redeemCurrentUserInvitation();
-        } catch (_) {
+          final password = pendingStaffJoin!.password;
+          await StaffService(
+            _supabase,
+          ).redeemCurrentUserInvitation(pendingStaffJoin!.businessCode);
+          pendingStaffJoin = null;
+          await _authService.setStaffPassword(password);
+        } on PostgrestException catch (e) {
+          if (mounted) {
+            setState(() {
+              loadingAccess = false;
+              authError = e.message;
+              page = AppPage.staffJoin;
+            });
+          }
+          return;
           // No matching invitation, or the RPC isn't deployed yet — ignore.
         }
       }
@@ -183,12 +259,8 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
         loadingAccess = false;
         if (pendingInvitationToken != null) {
           page = AppPage.acceptInvitation;
-        } else if (values.isEmpty) {
-          page = AppPage.createBusiness;
-        } else if (_distinctBusinesses(values).length > 1) {
-          page = AppPage.businessSelect;
         } else {
-          _selectAccess(values.first);
+          _routeToAvailableAccess(values);
         }
       });
     } on PostgrestException catch (_) {
@@ -213,6 +285,16 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   List<BusinessAccess> _distinctBusinesses(List<BusinessAccess> values) {
     final seen = <String>{};
     return values.where((value) => seen.add(value.businessId)).toList();
+  }
+
+  void _routeToAvailableAccess(List<BusinessAccess> values) {
+    if (values.isEmpty) {
+      page = AppPage.createBusiness;
+    } else if (_distinctBusinesses(values).length > 1) {
+      page = AppPage.businessSelect;
+    } else {
+      _selectAccess(values.first);
+    }
   }
 
   void _selectAccess(BusinessAccess value) {
@@ -296,7 +378,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                   return AccessPage(
                     onBack: () => go(AppPage.welcome),
                     onLogin: () => go(AppPage.login),
-                    onInvitation: () => go(AppPage.acceptInvitation),
+                    onInvitation: () => go(AppPage.staffJoin),
                   );
                 case AppPage.login:
                   return LoginPage(
@@ -310,6 +392,21 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                   return CreateAccountPage(
                     onBack: () => go(AppPage.login),
                     onCreateAccount: _createAccount,
+                    loading: loadingAccess,
+                    error: authError,
+                  );
+                case AppPage.staffJoin:
+                  return StaffJoinPage(
+                    onBack: () => go(AppPage.access),
+                    onStart: _startStaffJoin,
+                    loading: loadingAccess,
+                    error: authError,
+                  );
+                case AppPage.staffOtp:
+                  return StaffOtpPage(
+                    email: pendingStaffJoin?.email ?? '',
+                    onBack: () => go(AppPage.staffJoin),
+                    onVerify: _verifyStaffOtp,
                     loading: loadingAccess,
                     error: authError,
                   );
@@ -387,6 +484,16 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
             },
           ),
   );
+
+}
+
+class _StaffJoinAttempt {
+  const _StaffJoinAttempt({
+    required this.email,
+    required this.password,
+    required this.businessCode,
+  });
+  final String email, password, businessCode;
 }
 
 enum AppPage {
@@ -394,6 +501,8 @@ enum AppPage {
   access,
   login,
   createAccount,
+  staffJoin,
+  staffOtp,
   createBusiness,
   success,
   businessSelect,

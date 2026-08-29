@@ -51,6 +51,12 @@ Future<void> main() async {
       await Supabase.initialize(
         url: AppConfig.supabaseUrl,
         publishableKey: AppConfig.supabasePublishableKey,
+        // Supabase Flutter owns the one-time web callback exchange and the
+        // existing mobile deep-link handling. The router only reacts to the
+        // resulting auth state.
+        authOptions: const FlutterAuthClientOptions(
+          detectSessionInUri: true,
+        ),
       );
     } catch (_) {
       initializationError =

@@ -6,6 +6,13 @@ class AppConfig {
     'SUPABASE_PUBLISHABLE_KEY',
   );
 
+  /// Destination for Supabase email-auth callbacks, including staff
+  /// invitation magic links. Override this for each deployed environment.
+  static const authEmailRedirectUrl = String.fromEnvironment(
+    'AUTH_EMAIL_REDIRECT_URL',
+    defaultValue: 'http://localhost:8080',
+  );
+
   /// Origin of the customer-facing scan destination.
   ///
   /// Placeholder until the separate Next.js project exists. Override with

@@ -344,6 +344,288 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   );
 }
 
+class SetStaffPasswordPage extends StatefulWidget {
+  const SetStaffPasswordPage({
+    super.key,
+    required this.email,
+    required this.role,
+    required this.onSetPassword,
+    required this.loading,
+    this.error,
+  });
+  final String email, role;
+  final ValueChanged<String> onSetPassword;
+  final bool loading;
+  final String? error;
+
+  @override
+  State<SetStaffPasswordPage> createState() => _SetStaffPasswordPageState();
+}
+
+class _SetStaffPasswordPageState extends State<SetStaffPasswordPage> {
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  String? _validationError;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AuthShell(
+    title: 'Set your password.',
+    subtitle: 'Your invitation has been verified. Set a password for future sign-ins.',
+    onBack: () {},
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _FormLabel('Signed in as'),
+        const SizedBox(height: 8),
+        Text(widget.email),
+        const SizedBox(height: 12),
+        _FormLabel('Assigned role'),
+        const SizedBox(height: 8),
+        Text(widget.role),
+        const SizedBox(height: 16),
+        const _FormLabel('Password'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _passwordController,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: const InputDecoration(hintText: 'At least 6 characters'),
+        ),
+        const SizedBox(height: 16),
+        const _FormLabel('Confirm password'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _confirmPasswordController,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: const InputDecoration(hintText: 'Repeat your password'),
+        ),
+        const SizedBox(height: 22),
+        FilledButton(
+          onPressed: widget.loading
+              ? null
+              : () {
+                  final password = _passwordController.text;
+                  if (password.length < 6) {
+                    setState(
+                      () => _validationError =
+                          'Enter a password with at least 6 characters.',
+                    );
+                  } else if (password != _confirmPasswordController.text) {
+                    setState(() => _validationError = 'Your passwords do not match.');
+                  } else {
+                    setState(() => _validationError = null);
+                    widget.onSetPassword(password);
+                  }
+                },
+          style: _primaryStyle(full: true),
+          child: Text(widget.loading ? 'Saving password...' : 'Continue'),
+        ),
+        if (_validationError != null) ...[
+          const SizedBox(height: 12),
+          _AuthError(message: _validationError!),
+        ],
+        if (widget.error != null) ...[
+          const SizedBox(height: 12),
+          _AuthError(message: widget.error!),
+        ],
+      ],
+    ),
+  );
+}
+
+class StaffJoinPage extends StatefulWidget {
+  const StaffJoinPage({
+    super.key,
+    required this.onBack,
+    required this.onStart,
+    required this.loading,
+    this.error,
+  });
+  final VoidCallback onBack;
+  final void Function(String email, String password, String businessCode) onStart;
+  final bool loading;
+  final String? error;
+
+  @override
+  State<StaffJoinPage> createState() => _StaffJoinPageState();
+}
+
+class _StaffJoinPageState extends State<StaffJoinPage> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _businessCodeController = TextEditingController();
+  String? _validationError;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _businessCodeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AuthShell(
+    title: 'Join a team.',
+    subtitle: 'Use the email your owner invited and the restaurant code they gave you.',
+    onBack: widget.onBack,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _FormLabel('Invited email address'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: const InputDecoration(hintText: 'you@example.com'),
+        ),
+        const SizedBox(height: 16),
+        const _FormLabel('Restaurant code'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _businessCodeController,
+          textCapitalization: TextCapitalization.characters,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: const InputDecoration(hintText: 'e.g. COURTYARD01'),
+        ),
+        const SizedBox(height: 16),
+        const _FormLabel('Create password'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _passwordController,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: const InputDecoration(hintText: 'At least 6 characters'),
+        ),
+        const SizedBox(height: 16),
+        const _FormLabel('Confirm password'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _confirmPasswordController,
+          obscureText: true,
+          enableSuggestions: false,
+          autocorrect: false,
+          decoration: const InputDecoration(hintText: 'Repeat your password'),
+        ),
+        const SizedBox(height: 22),
+        FilledButton(
+          onPressed: widget.loading
+              ? null
+              : () {
+                  final email = _emailController.text.trim().toLowerCase();
+                  final password = _passwordController.text;
+                  final businessCode =
+                      _businessCodeController.text.trim().toUpperCase();
+                  if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email) ||
+                      password.length < 6 ||
+                      !RegExp(r'^[A-Z0-9]{6,20}$').hasMatch(businessCode)) {
+                    setState(
+                      () => _validationError =
+                          'Enter your invited email, a 6-20 character restaurant code, and a password with at least 6 characters.',
+                    );
+                  } else if (password != _confirmPasswordController.text) {
+                    setState(() => _validationError = 'Your passwords do not match.');
+                  } else {
+                    setState(() => _validationError = null);
+                    widget.onStart(email, password, businessCode);
+                  }
+                },
+          style: _primaryStyle(full: true),
+          child: Text(widget.loading ? 'Sending code...' : 'Send verification code'),
+        ),
+        if (_validationError != null) ...[
+          const SizedBox(height: 12),
+          _AuthError(message: _validationError!),
+        ],
+        if (widget.error != null) ...[
+          const SizedBox(height: 12),
+          _AuthError(message: widget.error!),
+        ],
+      ],
+    ),
+  );
+}
+
+class StaffOtpPage extends StatefulWidget {
+  const StaffOtpPage({
+    super.key,
+    required this.email,
+    required this.onBack,
+    required this.onVerify,
+    required this.loading,
+    this.error,
+  });
+  final String email;
+  final VoidCallback onBack;
+  final ValueChanged<String> onVerify;
+  final bool loading;
+  final String? error;
+
+  @override
+  State<StaffOtpPage> createState() => _StaffOtpPageState();
+}
+
+class _StaffOtpPageState extends State<StaffOtpPage> {
+  final _codeController = TextEditingController();
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AuthShell(
+    title: 'Check your email.',
+    subtitle: 'Enter the six-digit verification code sent to ${widget.email}.',
+    onBack: widget.onBack,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _codeController,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          decoration: const InputDecoration(labelText: 'Verification code'),
+        ),
+        const SizedBox(height: 22),
+        FilledButton(
+          onPressed: widget.loading
+              ? null
+              : () {
+                  final code = _codeController.text.trim();
+                  if (RegExp(r'^\d{6}$').hasMatch(code)) {
+                    widget.onVerify(code);
+                  }
+                },
+          style: _primaryStyle(full: true),
+          child: Text(widget.loading ? 'Verifying...' : 'Verify and join'),
+        ),
+        if (widget.error != null) ...[
+          const SizedBox(height: 12),
+          _AuthError(message: widget.error!),
+        ],
+      ],
+    ),
+  );
+}
+
 class _AuthError extends StatelessWidget {
   const _AuthError({required this.message});
   final String message;
