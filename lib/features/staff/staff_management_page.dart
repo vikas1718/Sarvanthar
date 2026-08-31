@@ -73,9 +73,12 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
       );
       if (!mounted) return;
       setState(() => busy = false);
-      final message = draft.email != null
+      var message = draft.email != null
           ? 'The invitation is ready for ${draft.email}. Ask them to choose “I’m joining a team”, enter their email, password, and your business code, then verify the six-digit email code.'
           : 'The invitation is ready. Staff must join with their email, password, business code, and a six-digit email code.';
+      if (draft.email != null) {
+        message = 'The invitation is ready for ${draft.email}. Ask them to sign up or log in with that email. They will see an invitation notification and can accept or reject it.';
+      }
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(

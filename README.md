@@ -2,6 +2,16 @@ flutter run -d web-server --web-port 8080 --dart-define=SUPABASE_URL=https://hyn
 
 # ServeFlow
 
+## Developer-managed organization setup
+
+All users use the regular sign-up and login screens. An organization can only be created with a one-time developer code. After applying the latest Supabase migration, promote the initial developer once in the Supabase SQL editor:
+
+```sql
+update public.profiles set is_developer = true where id = '<auth-user-id>';
+```
+
+That user can select **Admin login** above the normal login form and create developer codes for restaurant owners. Owners enter one code when creating an organization, including from the dashboard sidebar. Email invitees see an accept/reject notification after signing in; their role is only activated after acceptance.
+
 Multi-tenant restaurant and food-court management dashboard. Flutter front end, Supabase (Postgres + RLS) back end.
 
 One deployment serves many businesses. A business is either a **restaurant** (single kitchen, staff attached directly to the business) or a **food court** (multiple stalls, staff attached to a stall). Access, menus, tables, and QR codes are all scoped by that distinction.

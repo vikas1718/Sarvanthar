@@ -11,7 +11,7 @@ class BusinessProfileService {
     final row = await _client
         .from('businesses')
         .select(
-          'id, name, type, business_code, logo_url, phone, email, address, currency, tax_percentage',
+          'id, name, type, logo_url, phone, email, address, currency, tax_percentage',
         )
         .eq('id', businessId)
         .single();

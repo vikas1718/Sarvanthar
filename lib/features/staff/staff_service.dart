@@ -58,13 +58,17 @@ class StaffService {
     params: {'p_business_id': businessId, 'p_invitation_id': invitationId},
   );
 
-  /// Applies any pending invitation addressed to the signed-in user's email,
-  /// granting the role it carries. Safe to call on every sign-in: it does
-  /// nothing when no matching invitation exists.
-  Future<void> redeemCurrentUserInvitation(String businessCode) => _client.rpc(
-    'redeem_current_staff_invitation',
-    params: {'p_business_code': businessCode},
-  );
+  Future<EmailInvitation?> loadMyPendingEmailInvitation() async {
+    final rows = await _client.rpc<List<dynamic>>('get_my_pending_email_invitation');
+    if (rows.isEmpty) return null;
+    return EmailInvitation.fromJson(Map<String, dynamic>.from(rows.first as Map));
+  }
+
+  Future<void> decideMyEmailInvitation(String invitationId, bool accept) =>
+      _client.rpc(
+        'decide_my_email_invitation',
+        params: {'p_invitation_id': invitationId, 'p_accept': accept},
+      );
 
   Future<void> disable(String businessId, StaffMember member) =>
       member.scope == 'business'

@@ -206,11 +206,6 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
                 readOnly: true,
               ),
               _ProfileField(
-                label: 'Business Code',
-                initialValue: profile.businessCode,
-                readOnly: true,
-              ),
-              _ProfileField(
                 label: 'Logo URL',
                 controller: _logoController,
                 hintText: 'Optional image URL',

@@ -149,10 +149,11 @@ class LoginPage extends StatefulWidget {
     required this.onBack,
     required this.onSignIn,
     required this.onCreateAccount,
+    required this.onAdminLogin,
     required this.loading,
     this.error,
   });
-  final VoidCallback onBack;
+  final VoidCallback onBack, onAdminLogin;
   final void Function(String email, String password) onSignIn;
   final VoidCallback onCreateAccount;
   final bool loading;
@@ -179,6 +180,12 @@ class _LoginPageState extends State<LoginPage> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        OutlinedButton.icon(
+          onPressed: widget.loading ? null : widget.onAdminLogin,
+          icon: const Icon(Icons.admin_panel_settings_outlined),
+          label: const Text('Admin login'),
+        ),
+        const SizedBox(height: 18),
         const _FormLabel('Email address'),
         const SizedBox(height: 8),
         TextField(
@@ -452,7 +459,7 @@ class StaffJoinPage extends StatefulWidget {
     this.error,
   });
   final VoidCallback onBack;
-  final void Function(String email, String password, String businessCode) onStart;
+  final void Function(String email, String password) onStart;
   final bool loading;
   final String? error;
 
@@ -464,7 +471,6 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _businessCodeController = TextEditingController();
   String? _validationError;
 
   @override
@@ -472,14 +478,13 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _businessCodeController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) => AuthShell(
     title: 'Join a team.',
-    subtitle: 'Use the email your owner invited and the restaurant code they gave you.',
+    subtitle: 'Use the email your owner invited.',
     onBack: widget.onBack,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -492,16 +497,6 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
           autocorrect: false,
           enableSuggestions: false,
           decoration: const InputDecoration(hintText: 'you@example.com'),
-        ),
-        const SizedBox(height: 16),
-        const _FormLabel('Restaurant code'),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _businessCodeController,
-          textCapitalization: TextCapitalization.characters,
-          autocorrect: false,
-          enableSuggestions: false,
-          decoration: const InputDecoration(hintText: 'e.g. COURTYARD01'),
         ),
         const SizedBox(height: 16),
         const _FormLabel('Create password'),
@@ -530,20 +525,17 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
               : () {
                   final email = _emailController.text.trim().toLowerCase();
                   final password = _passwordController.text;
-                  final businessCode =
-                      _businessCodeController.text.trim().toUpperCase();
                   if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email) ||
-                      password.length < 6 ||
-                      !RegExp(r'^[A-Z0-9]{6,20}$').hasMatch(businessCode)) {
+                      password.length < 6) {
                     setState(
                       () => _validationError =
-                          'Enter your invited email, a 6-20 character restaurant code, and a password with at least 6 characters.',
+                          'Enter your invited email and a password with at least 6 characters.',
                     );
                   } else if (password != _confirmPasswordController.text) {
                     setState(() => _validationError = 'Your passwords do not match.');
                   } else {
                     setState(() => _validationError = null);
-                    widget.onStart(email, password, businessCode);
+                    widget.onStart(email, password);
                   }
                 },
           style: _primaryStyle(full: true),

@@ -18,6 +18,7 @@ class DashboardPage extends StatelessWidget {
     required this.onAddStaff,
     required this.onStaff,
     required this.onSelectStall,
+    required this.onCreateOrganization,
     required this.onLogout,
   });
   final String section, access, businessName, businessId;
@@ -28,7 +29,7 @@ class DashboardPage extends StatelessWidget {
   final List<BusinessAccess> stallAccess;
   final bool staffRole;
   final ValueChanged<String> onSection;
-  final VoidCallback onAddStaff, onStaff, onLogout;
+  final VoidCallback onAddStaff, onStaff, onCreateOrganization, onLogout;
   final ValueChanged<BusinessAccess> onSelectStall;
   static const items = [
     ('Overview', Icons.grid_view_rounded),
@@ -57,6 +58,7 @@ class DashboardPage extends StatelessWidget {
       stallAccess: stallAccess,
       onSection: onSection,
       onSelectStall: onSelectStall,
+      onCreateOrganization: onCreateOrganization,
       onLogout: onLogout,
     );
     return Scaffold(
@@ -77,23 +79,42 @@ class DashboardPage extends StatelessWidget {
         children: [
           if (desktop) SizedBox(width: 252, child: side),
           Expanded(
-            child: _DashboardContent(
-              section: section,
-              staffRole: staffRole,
-              isFoodCourt: isFoodCourt,
+            child: _SubscriptionGate(
               businessId: businessId,
-              businessName: businessName,
-              currentRole: currentRole,
-              selectedStallId: selectedStallId,
-              onSection: onSection,
-              onAddStaff: onAddStaff,
-              onStaff: onStaff,
+              child: _DashboardContent(
+                section: section, staffRole: staffRole, isFoodCourt: isFoodCourt,
+                businessId: businessId, businessName: businessName, currentRole: currentRole,
+                selectedStallId: selectedStallId, onSection: onSection, onAddStaff: onAddStaff, onStaff: onStaff,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _SubscriptionGate extends StatelessWidget {
+  const _SubscriptionGate({required this.businessId, required this.child});
+  final String businessId; final Widget child;
+  @override
+  Widget build(BuildContext context) => FutureBuilder<List<dynamic>>(
+    future: Supabase.instance.client.rpc<List<dynamic>>('business_access_status', params: {'p_business_id': businessId}),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      final status = Map<String, dynamic>.from(snapshot.data!.first as Map);
+      if (status['is_active'] == true) {
+        final plan = status['plan'] as String;
+        final expiry = DateTime.parse((plan == 'pro' ? status['subscription_expires_at'] : status['trial_expires_at']) as String);
+        final days = expiry.difference(DateTime.now()).inDays + 1;
+        return Column(children: [
+          Container(width: double.infinity, color: const Color(0xffffedd5), padding: const EdgeInsets.all(10), child: Text(plan == 'pro' ? 'Pro plan active until ${expiry.toLocal().toString().split(' ').first}' : 'Free trial: $days day${days == 1 ? '' : 's'} remaining • ends ${expiry.toLocal().toString().split(' ').first}', textAlign: TextAlign.center)),
+          Expanded(child: child),
+        ]);
+      }
+      return _PageShell(title: 'Your free trial has expired', subtitle: 'Your restaurant features are locked. Upgrade to Pro to restore full access.', child: FilledButton(onPressed: () => _notice(context, 'Pro upgrades will be available here.'), style: _primaryStyle(), child: const Text('Upgrade to Pro')));
+    },
+  );
 }
 
 class _Sidebar extends StatelessWidget {
@@ -108,6 +129,7 @@ class _Sidebar extends StatelessWidget {
     required this.stallAccess,
     required this.onSection,
     required this.onSelectStall,
+    required this.onCreateOrganization,
     required this.onLogout,
   });
   final String active, access, businessName;
@@ -117,7 +139,7 @@ class _Sidebar extends StatelessWidget {
   final List<BusinessAccess> stallAccess;
   final ValueChanged<String> onSection;
   final ValueChanged<BusinessAccess> onSelectStall;
-  final VoidCallback onLogout;
+  final VoidCallback onCreateOrganization, onLogout;
   @override
   Widget build(BuildContext context) => Container(
     color: _navy,
@@ -229,6 +251,16 @@ class _Sidebar extends StatelessWidget {
                 ),
               ),
             ),
+        if (!staffRole)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _SideItem(
+              label: 'Create organization',
+              icon: Icons.add_business_outlined,
+              selected: false,
+              onTap: onCreateOrganization,
+            ),
+          ),
         const Spacer(),
         Container(
           padding: const EdgeInsets.all(12),
@@ -298,16 +330,18 @@ class _SideItem extends StatelessWidget {
     required this.icon,
     required this.selected,
     required this.onTap,
+    this.disabled = false,
   });
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+  final bool disabled;
   @override
   Widget build(BuildContext c) => Material(
     color: Colors.transparent,
     child: InkWell(
-      onTap: onTap,
+      onTap: disabled ? null : onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -320,7 +354,9 @@ class _SideItem extends StatelessWidget {
             Icon(
               icon,
               size: 20,
-              color: selected
+              color: disabled
+                  ? const Color(0xff718099)
+                  : selected
                   ? const Color(0xffffc36e)
                   : const Color(0xffb8c1cf),
             ),
@@ -328,7 +364,11 @@ class _SideItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.white : const Color(0xffc1c9d5),
+                color: disabled
+                    ? const Color(0xff718099)
+                    : selected
+                    ? Colors.white
+                    : const Color(0xffc1c9d5),
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),

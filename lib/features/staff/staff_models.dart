@@ -81,3 +81,22 @@ class InvitationPreview {
   final String? stallName;
   final DateTime expiresAt;
 }
+
+class EmailInvitation {
+  const EmailInvitation({
+    required this.id,
+    required this.businessName,
+    required this.role,
+    this.stallName,
+  });
+
+  factory EmailInvitation.fromJson(Map<String, dynamic> json) => EmailInvitation(
+    id: json['invitation_id'] as String,
+    businessName: json['business_name'] as String,
+    role: json['role'] as String,
+    stallName: json['stall_name'] as String?,
+  );
+
+  final String id, businessName, role;
+  final String? stallName;
+}

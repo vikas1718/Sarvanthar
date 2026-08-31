@@ -20,6 +20,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   BusinessAccess? selectedAccess;
   String? pendingInvitationToken;
   _StaffJoinAttempt? pendingStaffJoin;
+  bool adminLoginRequested = false;
   StreamSubscription<AuthState>? _authSubscription;
 
   SupabaseClient get _supabase => Supabase.instance.client;
@@ -111,7 +112,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   Future<void> _createBusiness(
     String name,
     bool isFoodCourt,
-    String businessCode,
+    String phone, String email, String ownerName, String address, String logoUrl,
   ) async {
     setState(() {
       loadingAccess = true;
@@ -123,14 +124,15 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
         params: {
           'p_name': name,
           'p_type': isFoodCourt ? 'food_court' : 'restaurant',
-          'p_business_code': businessCode,
+          'p_phone': phone, 'p_email': email, 'p_owner_name': ownerName,
+          'p_address': address, 'p_logo_url': logoUrl,
         },
       );
       await _loadAccess();
     } on PostgrestException catch (_) {
       if (mounted) {
         setState(
-          () => authError = 'We could not create that workspace. The business code may already be in use.',
+          () => authError = 'We could not create that restaurant. Please check the details and try again.',
         );
       }
     } catch (_) {
@@ -147,7 +149,6 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   Future<void> _startStaffJoin(
     String email,
     String password,
-    String businessCode,
   ) async {
     setState(() {
       loadingAccess = true;
@@ -160,7 +161,6 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
         pendingStaffJoin = _StaffJoinAttempt(
           email: email,
           password: password,
-          businessCode: businessCode,
         );
         loadingAccess = false;
         page = AppPage.staffOtp;
@@ -225,31 +225,27 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       // link. Apply any invitation addressed to their verified email so their
       // role is granted automatically. Best-effort: ignored when none matches
       // or the RPC is not deployed yet. Skipped when redeeming a typed token.
-      if (pendingStaffJoin != null) {
-        try {
-          final password = pendingStaffJoin!.password;
-          await StaffService(
-            _supabase,
-          ).redeemCurrentUserInvitation(pendingStaffJoin!.businessCode);
-          pendingStaffJoin = null;
-          await _authService.setStaffPassword(password);
-        } on PostgrestException catch (e) {
-          if (mounted) {
-            setState(() {
-              loadingAccess = false;
-              authError = e.message;
-              page = AppPage.staffJoin;
-            });
+      final isAdmin = await _supabase.rpc<bool>('is_platform_admin');
+      if (adminLoginRequested) {
+        if (!mounted) return;
+        setState(() {
+          loadingAccess = false;
+          if (isAdmin) {
+            page = AppPage.adminPortal;
+          } else {
+            adminLoginRequested = false;
+            page = AppPage.login;
+            authError = 'This account does not have platform admin access.';
           }
-          return;
-          // No matching invitation, or the RPC isn't deployed yet — ignore.
-        }
+        });
+        return;
       }
       final profile = await _supabase
           .from('profiles')
           .select('full_name')
           .maybeSingle();
       final values = await AccessRepository(_supabase).loadAccess();
+      final invitation = await StaffService(_supabase).loadMyPendingEmailInvitation();
       if (!mounted) {
         return;
       }
@@ -261,6 +257,9 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
           page = AppPage.acceptInvitation;
         } else {
           _routeToAvailableAccess(values);
+        }
+        if (invitation != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) => _showInvitationPrompt(invitation));
         }
       });
     } on PostgrestException catch (_) {
@@ -287,9 +286,36 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     return values.where((value) => seen.add(value.businessId)).toList();
   }
 
+  Future<void> _showInvitationPrompt(EmailInvitation invitation) async {
+    if (!mounted) return;
+    final accept = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.notifications_active_outlined, color: _amber),
+        title: const Text('You have a team invitation'),
+        content: Text('${invitation.businessName} invited you as ${invitation.role}${invitation.stallName == null ? '' : ' for ${invitation.stallName}'}. Would you like to join?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Reject')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Accept')),
+        ],
+      ),
+    );
+    if (accept == null || !mounted) return;
+    try {
+      await StaffService(_supabase).decideMyEmailInvitation(invitation.id, accept);
+      if (mounted) {
+        _notice(context, accept ? 'Invitation accepted. Your role is now active.' : 'Invitation rejected.');
+        await _loadAccess();
+      }
+    } on PostgrestException catch (e) {
+      if (mounted) _notice(context, e.message);
+    }
+  }
+
   void _routeToAvailableAccess(List<BusinessAccess> values) {
     if (values.isEmpty) {
-      page = AppPage.createBusiness;
+      page = AppPage.noOrganization;
     } else if (_distinctBusinesses(values).length > 1) {
       page = AppPage.businessSelect;
     } else {
@@ -311,9 +337,10 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       await _authService.signOut();
       if (mounted) {
         setState(() {
-          page = AppPage.welcome;
-          selectedAccess = null;
-          availableAccess = const [];
+            page = AppPage.welcome;
+            selectedAccess = null;
+            availableAccess = const [];
+            adminLoginRequested = false;
         });
       }
     } catch (_) {
@@ -373,18 +400,28 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
             builder: (context) {
               switch (page) {
                 case AppPage.welcome:
-                  return WelcomePage(onStart: () => go(AppPage.access));
+                  return WelcomePage(
+                    onLogin: () => go(AppPage.login),
+                    onSignUp: () => go(AppPage.createAccount),
+                  );
                 case AppPage.access:
                   return AccessPage(
                     onBack: () => go(AppPage.welcome),
                     onLogin: () => go(AppPage.login),
-                    onInvitation: () => go(AppPage.staffJoin),
+                    onInvitation: () => go(AppPage.login),
                   );
                 case AppPage.login:
                   return LoginPage(
-                    onBack: () => go(AppPage.access),
+                    onBack: () => go(AppPage.welcome),
                     onSignIn: _signIn,
-                    onCreateAccount: () => go(AppPage.createAccount),
+                    onCreateAccount: () => setState(() {
+                      adminLoginRequested = false;
+                      page = AppPage.createAccount;
+                    }),
+                    onAdminLogin: () => setState(() {
+                      adminLoginRequested = true;
+                      authError = 'Sign in with your platform admin account.';
+                    }),
                     loading: loadingAccess,
                     error: authError,
                   );
@@ -412,11 +449,19 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                   );
                 case AppPage.createBusiness:
                   return CreateBusinessPage(
-                    onBack: () => go(AppPage.login),
+                    onBack: () => go(AppPage.noOrganization),
                     onCreate: _createBusiness,
                     loading: loadingAccess,
                     error: authError,
                   );
+                case AppPage.noOrganization:
+                  return NoOrganizationPage(
+                    userName: profileName,
+                    onCreateOrganization: () => go(AppPage.createBusiness),
+                    onLogout: _signOut,
+                  );
+                case AppPage.adminPortal:
+                  return AdminPortalPage(onLogout: _signOut);
                 case AppPage.success:
                   return SuccessPage(onOpen: () => go(AppPage.dashboard));
                 case AppPage.businessSelect:
@@ -454,6 +499,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                     onStaff: () => go(AppPage.staffDetails),
                     onSelectStall: (value) =>
                         setState(() => _selectAccess(value)),
+                    onCreateOrganization: () => go(AppPage.createBusiness),
                     onLogout: _signOut,
                   );
                 case AppPage.addStaff:
@@ -491,9 +537,8 @@ class _StaffJoinAttempt {
   const _StaffJoinAttempt({
     required this.email,
     required this.password,
-    required this.businessCode,
   });
-  final String email, password, businessCode;
+  final String email, password;
 }
 
 enum AppPage {
@@ -510,4 +555,6 @@ enum AppPage {
   addStaff,
   staffDetails,
   acceptInvitation,
+  adminPortal,
+  noOrganization,
 }

@@ -3,7 +3,6 @@ class BusinessProfile {
     required this.id,
     required this.name,
     required this.type,
-    required this.businessCode,
     this.logoUrl,
     this.phone,
     this.email,
@@ -18,7 +17,6 @@ class BusinessProfile {
       id: json['id'] as String,
       name: json['name'] as String,
       type: json['type'] as String,
-      businessCode: json['business_code'] as String,
       logoUrl: json['logo_url'] as String?,
       phone: json['phone'] as String?,
       email: json['email'] as String?,
@@ -31,7 +29,6 @@ class BusinessProfile {
   final String id;
   final String name;
   final String type;
-  final String businessCode;
   final String? logoUrl;
   final String? phone;
   final String? email;

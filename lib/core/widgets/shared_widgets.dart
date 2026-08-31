@@ -73,8 +73,8 @@ class Brand extends StatelessWidget {
 }
 
 class WelcomePage extends StatelessWidget {
-  const WelcomePage({super.key, required this.onStart});
-  final VoidCallback onStart;
+  const WelcomePage({super.key, required this.onLogin, required this.onSignUp});
+  final VoidCallback onLogin, onSignUp;
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -127,10 +127,15 @@ class WelcomePage extends StatelessWidget {
                           ),
                           const SizedBox(height: 30),
                           FilledButton.icon(
-                            onPressed: onStart,
+                            onPressed: onSignUp,
                             icon: const Icon(Icons.arrow_forward_rounded),
-                            label: const Text('Set up your business'),
+                            label: const Text('Sign up'),
                             style: _primaryStyle(),
+                          ),
+                          const SizedBox(height: 10),
+                          TextButton(
+                            onPressed: onLogin,
+                            child: const Text('Already have an account? Log in'),
                           ),
                         ],
                       ),
