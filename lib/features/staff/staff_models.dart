@@ -86,6 +86,7 @@ class EmailInvitation {
   const EmailInvitation({
     required this.id,
     required this.businessName,
+    required this.ownerName,
     required this.role,
     this.stallName,
   });
@@ -93,10 +94,11 @@ class EmailInvitation {
   factory EmailInvitation.fromJson(Map<String, dynamic> json) => EmailInvitation(
     id: json['invitation_id'] as String,
     businessName: json['business_name'] as String,
+    ownerName: json['owner_name'] as String? ?? 'The restaurant owner',
     role: json['role'] as String,
     stallName: json['stall_name'] as String?,
   );
 
-  final String id, businessName, role;
+  final String id, businessName, ownerName, role;
   final String? stallName;
 }

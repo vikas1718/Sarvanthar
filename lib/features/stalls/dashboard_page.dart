@@ -85,10 +85,18 @@ class DashboardPage extends StatelessWidget {
             child: _SubscriptionGate(
               businessId: businessId,
               child: _DashboardContent(
-                section: section, staffRole: staffRole, isFoodCourt: isFoodCourt,
-                businessId: businessId, businessName: businessName, currentRole: currentRole,
-                selectedStallId: selectedStallId, userName: userName, userEmail: userEmail,
-                onSection: onSection, onAddStaff: onAddStaff, onStaff: onStaff,
+                section: section,
+                staffRole: staffRole,
+                isFoodCourt: isFoodCourt,
+                businessId: businessId,
+                businessName: businessName,
+                currentRole: currentRole,
+                selectedStallId: selectedStallId,
+                userName: userName,
+                userEmail: userEmail,
+                onSection: onSection,
+                onAddStaff: onAddStaff,
+                onStaff: onStaff,
               ),
             ),
           ),
@@ -100,23 +108,54 @@ class DashboardPage extends StatelessWidget {
 
 class _SubscriptionGate extends StatelessWidget {
   const _SubscriptionGate({required this.businessId, required this.child});
-  final String businessId; final Widget child;
+  final String businessId;
+  final Widget child;
   @override
   Widget build(BuildContext context) => FutureBuilder<List<dynamic>>(
-    future: Supabase.instance.client.rpc<List<dynamic>>('business_access_status', params: {'p_business_id': businessId}),
+    future: Supabase.instance.client.rpc<List<dynamic>>(
+      'business_access_status',
+      params: {'p_business_id': businessId},
+    ),
     builder: (context, snapshot) {
-      if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+      if (!snapshot.hasData)
+        return const Center(child: CircularProgressIndicator());
       final status = Map<String, dynamic>.from(snapshot.data!.first as Map);
       if (status['is_active'] == true) {
         final plan = status['plan'] as String;
-        final expiry = DateTime.parse((plan == 'pro' ? status['subscription_expires_at'] : status['trial_expires_at']) as String);
+        final expiry = DateTime.parse(
+          (plan == 'pro'
+                  ? status['subscription_expires_at']
+                  : status['trial_expires_at'])
+              as String,
+        );
         final days = expiry.difference(DateTime.now()).inDays + 1;
-        return Column(children: [
-          Container(width: double.infinity, color: const Color(0xffffedd5), padding: const EdgeInsets.all(10), child: Text(plan == 'pro' ? 'Pro plan active until ${expiry.toLocal().toString().split(' ').first}' : 'Free trial: $days day${days == 1 ? '' : 's'} remaining • ends ${expiry.toLocal().toString().split(' ').first}', textAlign: TextAlign.center)),
-          Expanded(child: child),
-        ]);
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              color: const Color(0xffffedd5),
+              padding: const EdgeInsets.all(10),
+              child: Text(
+                plan == 'pro'
+                    ? 'Pro plan active until ${expiry.toLocal().toString().split(' ').first}'
+                    : 'Free trial: $days day${days == 1 ? '' : 's'} remaining • ends ${expiry.toLocal().toString().split(' ').first}',
+                textAlign: TextAlign.center,
+              ),
+            ),
+            Expanded(child: child),
+          ],
+        );
       }
-      return _PageShell(title: 'Your free trial has expired', subtitle: 'Your restaurant features are locked. Upgrade to Pro to restore full access.', child: FilledButton(onPressed: () => _notice(context, 'Pro upgrades will be available here.'), style: _primaryStyle(), child: const Text('Upgrade to Pro')));
+      return _PageShell(
+        title: 'Your free trial has expired',
+        subtitle: 'Your restaurant features are locked. Upgrade to Pro to restore full access.',
+        child: FilledButton(
+          onPressed: () =>
+              _notice(context, 'Pro upgrades will be available here.'),
+          style: _primaryStyle(),
+          child: const Text('Upgrade to Pro'),
+        ),
+      );
     },
   );
 }
@@ -182,9 +221,7 @@ class _Sidebar extends StatelessWidget {
                         .map(
                           (item) => PopupMenuItem(
                             value: item,
-                            child: Text(
-                              '${item.stallName} · ${item.role}',
-                            ),
+                            child: Text('${item.stallName} · ${item.role}'),
                           ),
                         )
                         .toList(),
@@ -218,51 +255,49 @@ class _Sidebar extends StatelessWidget {
             padding: EdgeInsets.zero,
             children: [
               ...DashboardPage.items
-            .where(
-              (item) =>
-                  (item.$1 != 'Stalls' || (isFoodCourt && !staffRole)) &&
-                  (!staffRole ||
-                      (item.$1 != 'Business Settings' && item.$1 != 'Staff')) &&
-                  (item.$1 != 'Menu' ||
-                      [
-                        'owner',
-                        'manager',
-                        'kitchen',
-                      ].contains(access.split(' ').first.toLowerCase())) &&
-                  (item.$1 != 'Tables' ||
-                      [
-                        'owner',
-                        'manager',
-                      ].contains(access.split(' ').first.toLowerCase())) &&
-                  (item.$1 != 'QR Codes' ||
-                      [
-                        'owner',
-                        'manager',
-                      ].contains(access.split(' ').first.toLowerCase())) &&
-                  (item.$1 != 'Orders' ||
-                      [
-                        'owner',
-                        'manager',
-                        'kitchen',
-                        'cashier',
-                      ].contains(access.split(' ').first.toLowerCase())),
-            )
-            .map(
-              (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: _SideItem(
-                  label: e.$1,
-                  icon: e.$2,
-                  selected: active == e.$1,
-                  onTap: () {
-                    onSection(e.$1);
-                    if (Scaffold.maybeOf(context)?.isDrawerOpen ?? false) {
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-              ),
-            ),
+                  .where(
+                    (item) =>
+                        (item.$1 != 'Stalls' || (isFoodCourt && !staffRole)) &&
+                        (!staffRole ||
+                            (item.$1 != 'Business Settings' &&
+                                item.$1 != 'Staff')) &&
+                        (item.$1 != 'Menu' ||
+                            ['owner', 'manager', 'kitchen'].contains(
+                              access.split(' ').first.toLowerCase(),
+                            )) &&
+                        (item.$1 != 'Tables' ||
+                            ['owner', 'manager'].contains(
+                              access.split(' ').first.toLowerCase(),
+                            )) &&
+                        (item.$1 != 'QR Codes' ||
+                            ['owner', 'manager'].contains(
+                              access.split(' ').first.toLowerCase(),
+                            )) &&
+                        (item.$1 != 'Orders' ||
+                            [
+                              'owner',
+                              'manager',
+                              'kitchen',
+                              'cashier',
+                            ].contains(access.split(' ').first.toLowerCase())),
+                  )
+                  .map(
+                    (e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: _SideItem(
+                        label: e.$1,
+                        icon: e.$2,
+                        selected: active == e.$1,
+                        onTap: () {
+                          onSection(e.$1);
+                          if (Scaffold.maybeOf(context)?.isDrawerOpen ??
+                              false) {
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
             ],
           ),
         ),
@@ -361,11 +396,7 @@ class _BrandFallbackIcon extends StatelessWidget {
       color: _amber,
       borderRadius: BorderRadius.circular(10),
     ),
-    child: const Icon(
-      Icons.restaurant_rounded,
-      color: Colors.white,
-      size: 20,
-    ),
+    child: const Icon(Icons.restaurant_rounded, color: Colors.white, size: 20),
   );
 }
 
@@ -487,10 +518,7 @@ class _DashboardContent extends StatelessWidget {
       return const _UpgradePlansPage();
     }
     if (section == 'Account Settings') {
-      return _AccountSettingsPage(
-        userName: userName,
-        userEmail: userEmail,
-      );
+      return _AccountSettingsPage(userName: userName, userEmail: userEmail);
     }
     if (section == 'QR Codes' && ['owner', 'manager'].contains(currentRole)) {
       return QrManagementPage(
@@ -512,62 +540,94 @@ class _DashboardContent extends StatelessWidget {
 class _UpgradePlansPage extends StatelessWidget {
   const _UpgradePlansPage();
 
+  // Keep pricing in one place until subscription billing is implemented.
+  static const _basicMonthlyPrice = '₹200';
+
   @override
   Widget build(BuildContext context) => _PageShell(
     title: 'Upgrade plan',
-    subtitle: 'Choose the plan that fits your restaurant today.',
-    child: LayoutBuilder(
-      builder: (context, box) {
-        final wide = box.maxWidth >= 920;
-        final cards = [
-          _PlanCard(
-            name: 'Basic',
-            description: 'For small teams getting started.',
-            price: '₹0',
-            features: const [
-              ('Dashboard access', true),
-              ('Menu management', true),
-              ('Advanced reports', false),
-              ('Priority support', false),
-            ],
-          ),
-          _PlanCard(
-            name: 'Advanced',
-            description: 'For growing restaurants and food courts.',
-            price: '₹1,499',
-            currentPlan: true,
-            features: const [
-              ('Dashboard access', true),
-              ('Menu management', true),
-              ('Advanced reports', true),
-              ('Priority support', false),
-            ],
-          ),
-          _PlanCard(
-            name: 'Enterprise',
-            description: 'For multi-location operations.',
-            price: '₹4,999',
-            features: const [
-              ('Dashboard access', true),
-              ('Menu management', true),
-              ('Advanced reports', true),
-              ('Priority support', true),
-            ],
-          ),
-        ];
-        return Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: cards
-              .map(
-                (card) => SizedBox(
-                  width: wide ? (box.maxWidth - 32) / 3 : box.maxWidth,
-                  child: card,
-                ),
-              )
-              .toList(),
-        );
-      },
+    subtitle: 'Choose the plan that fits your business.',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _TrialMessage(),
+        const SizedBox(height: 20),
+        LayoutBuilder(
+          builder: (context, box) {
+            final columns = box.maxWidth >= 920
+                ? 4
+                : box.maxWidth >= 600
+                ? 2
+                : 1;
+            final cards = [
+              _PlanCard(
+                name: 'FREE TRIAL',
+                description: 'All features included',
+                price: '₹0',
+                features: const [
+                  ('All Basic plan features', true),
+                ],
+              ),
+              _PlanCard(
+                name: 'BASIC',
+                description: 'For restaurants',
+                price: '₹1,499',
+                features: const [
+                  ('Dashboard and daily sales overview', true),
+                  ('Menu and item management', true),
+                  ('Order management', true),
+                  ('Table management', true),
+                  ('QR code menus', true),
+                  ('Staff management', true),
+                  ('After trial', true),
+                ],
+              ),
+              _PlanCard(
+                name: 'ADVANCED',
+                description: 'For growing businesses',
+                price: '₹4,999',
+                features: const [('Placeholder features', true)],
+              ),
+              const _PlanCard(
+                name: 'ENTERPRISE',
+                description: 'For large businesses and food courts',
+                price: 'Custom pricing',
+                features: [],
+              ),
+            ];
+            return Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              children: cards
+                  .map(
+                    (card) => SizedBox(
+                      width: (box.maxWidth - (16 * (columns - 1))) / columns,
+                      child: card,
+                    ),
+                  )
+                  .toList(),
+            );
+          },
+        ),
+      ],
+    ),
+  );
+}
+
+class _TrialMessage extends StatelessWidget {
+  const _TrialMessage();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: const Color(0xffffedd5),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: const Text(
+      'Your 7-day free trial includes all features. Subscribe from Day 8 to continue using ServeFlow.',
+      style: TextStyle(color: _navy, fontWeight: FontWeight.w700),
     ),
   );
 }
@@ -578,109 +638,106 @@ class _PlanCard extends StatelessWidget {
     required this.description,
     required this.price,
     required this.features,
-    this.currentPlan = false,
   });
 
   final String name;
   final String description;
   final String price;
-  final bool currentPlan;
   final List<(String, bool)> features;
 
   @override
-  Widget build(BuildContext context) => _Panel(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: _navy,
-                ),
-              ),
-            ),
-            if (currentPlan)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xffffedd5),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: const Text(
-                  'Current Plan',
-                  style: TextStyle(
-                    color: _amber,
-                    fontSize: 11,
+  Widget build(BuildContext context) {
+    final isTrial = name == 'FREE TRIAL';
+    final isBasic = name == 'BASIC';
+    final displayPrice = isTrial
+        ? '7 Days Free'
+        : isBasic
+        ? _UpgradePlansPage._basicMonthlyPrice
+        : name == 'ADVANCED'
+        ? 'Coming soon'
+        : price;
+
+    return _Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
+                    color: _navy,
                   ),
                 ),
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(description, style: const TextStyle(color: _muted)),
-        const SizedBox(height: 18),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              price,
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(width: 6),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 5),
-              child: Text('/month', style: TextStyle(color: _muted)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        ...features.map(
-          (feature) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              children: [
-                Icon(
-                  feature.$2 ? Icons.check_rounded : Icons.close_rounded,
-                  size: 18,
-                  color: feature.$2 ? const Color(0xff39825c) : const Color(0xffb85b4f),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    feature.$1,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(description, style: const TextStyle(color: _muted)),
+          const SizedBox(height: 18),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                displayPrice,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              if (isBasic) ...[
+                const SizedBox(width: 6),
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 5),
+                  child: Text('/month', style: TextStyle(color: _muted)),
                 ),
               ],
+            ],
+          ),
+          const SizedBox(height: 18),
+          ...features.map(
+            (feature) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    feature.$2 ? Icons.check_rounded : Icons.close_rounded,
+                    size: 18,
+                    color: feature.$2
+                        ? const Color(0xff39825c)
+                        : const Color(0xffb85b4f),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      feature.$1,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: currentPlan ? null : () => _notice(context, 'Upgrade actions are UI-only for now.'),
-            style: _primaryStyle(full: true),
-            child: Text(currentPlan ? 'Current Plan' : 'Upgrade'),
-          ),
-        ),
-      ],
-    ),
-  );
+          if (!isTrial) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () =>
+                    _notice(context, 'Upgrade actions are UI-only for now.'),
+                style: _primaryStyle(full: true),
+                child: Text(name == 'ENTERPRISE' ? 'Contact Us' : 'Subscribe'),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _AccountSettingsPage extends StatefulWidget {
-  const _AccountSettingsPage({
-    required this.userName,
-    required this.userEmail,
-  });
+  const _AccountSettingsPage({required this.userName, required this.userEmail});
 
   final String? userName;
   final String? userEmail;
@@ -728,10 +785,8 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
     title: 'Account settings',
     subtitle: 'Update your personal details and security preferences.',
     action: FilledButton.icon(
-      onPressed: () => _notice(
-        context,
-        'Profile changes are UI-only right now.',
-      ),
+      onPressed: () =>
+          _notice(context, 'Profile changes are UI-only right now.'),
       style: _primaryStyle(),
       icon: const Icon(Icons.save_outlined),
       label: const Text('Save changes'),
@@ -748,9 +803,7 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Edit how your profile appears across the dashboard.',
-              ),
+              const Text('Edit how your profile appears across the dashboard.'),
               const SizedBox(height: 20),
               _AccountField(
                 label: 'Full name',
@@ -805,9 +858,7 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Create a stronger password for your account access.',
-              ),
+              const Text('Create a stronger password for your account access.'),
               const SizedBox(height: 20),
               _AccountField(
                 label: 'Current password',
@@ -836,10 +887,8 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
-                  onPressed: () => _notice(
-                    context,
-                    'Password update is UI-only right now.',
-                  ),
+                  onPressed: () =>
+                      _notice(context, 'Password update is UI-only right now.'),
                   icon: const Icon(Icons.lock_reset_rounded),
                   label: const Text('Update password'),
                 ),
@@ -1118,27 +1167,35 @@ class _NewOrderPageState extends State<_NewOrderPage> {
                     children: [
                       Text(
                         category,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                      ),
-                      const SizedBox(height: 12),
-                      ..._items.where((item) => item.category == category).map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _MenuItemCard(
-                            item: item,
-                            quantity: _cart[item.name] ?? 0,
-                            onAdd: () => setState(() => _cart[item.name] = (_cart[item.name] ?? 0) + 1),
-                            onRemove: () => setState(() {
-                              final next = (_cart[item.name] ?? 0) - 1;
-                              if (next <= 0) {
-                                _cart.remove(item.name);
-                              } else {
-                                _cart[item.name] = next;
-                              }
-                            }),
-                          ),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      ..._items
+                          .where((item) => item.category == category)
+                          .map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _MenuItemCard(
+                                item: item,
+                                quantity: _cart[item.name] ?? 0,
+                                onAdd: () => setState(
+                                  () => _cart[item.name] =
+                                      (_cart[item.name] ?? 0) + 1,
+                                ),
+                                onRemove: () => setState(() {
+                                  final next = (_cart[item.name] ?? 0) - 1;
+                                  if (next <= 0) {
+                                    _cart.remove(item.name);
+                                  } else {
+                                    _cart[item.name] = next;
+                                  }
+                                }),
+                              ),
+                            ),
+                          ),
                     ],
                   ),
                 ),
@@ -1197,7 +1254,8 @@ class _NewOrderPageState extends State<_NewOrderPage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: FilledButton(
-                      onPressed: () => _notice(context, 'Place Order is UI-only for now.'),
+                      onPressed: () =>
+                          _notice(context, 'Place Order is UI-only for now.'),
                       style: _primaryStyle(full: true),
                       child: const Text('Place Order'),
                     ),
@@ -1220,11 +1278,7 @@ class _NewOrderPageState extends State<_NewOrderPage> {
         }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            menuColumn,
-            const SizedBox(height: 18),
-            cartColumn,
-          ],
+          children: [menuColumn, const SizedBox(height: 18), cartColumn],
         );
       },
     ),
@@ -1269,9 +1323,15 @@ class _MenuItemCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(item.name, style: const TextStyle(fontWeight: FontWeight.w800)),
+              Text(
+                item.name,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 4),
-              Text(_moneyAmount(item.price), style: const TextStyle(color: _muted)),
+              Text(
+                _moneyAmount(item.price),
+                style: const TextStyle(color: _muted),
+              ),
               if (item.options.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Wrap(
@@ -1297,7 +1357,10 @@ class _MenuItemCard extends StatelessWidget {
               onPressed: quantity > 0 ? onRemove : null,
               icon: const Icon(Icons.remove_circle_outline),
             ),
-            Text('$quantity', style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text(
+              '$quantity',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
             IconButton(
               onPressed: onAdd,
               icon: const Icon(Icons.add_circle_outline),
@@ -1441,8 +1504,7 @@ class _Overview extends StatelessWidget {
         ? 'Kitchen access • Chaat & Co. and South Bowl'
         : 'Sunday, 16 August  •  The Courtyard Food Hall',
     action: OutlinedButton.icon(
-      onPressed: () =>
-          _notice(c, "Showing today's service snapshot."),
+      onPressed: () => _notice(c, "Showing today's service snapshot."),
       icon: const Icon(Icons.calendar_today_outlined, size: 17),
       label: const Text('Today'),
     ),

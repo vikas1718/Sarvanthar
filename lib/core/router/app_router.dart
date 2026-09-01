@@ -8,6 +8,7 @@ class ServeFlowApp extends StatefulWidget {
 }
 
 class _ServeFlowAppState extends State<ServeFlowApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
   AppPage page = AppPage.login;
   String section = 'Overview';
   bool staffRole = false;
@@ -21,6 +22,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   String? pendingInvitationToken;
   _StaffJoinAttempt? pendingStaffJoin;
   bool adminLoginRequested = false;
+  bool hasPendingEmailInvitation = false;
   StreamSubscription<AuthState>? _authSubscription;
 
   SupabaseClient get _supabase => Supabase.instance.client;
@@ -259,15 +261,20 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       }
       setState(() {
         availableAccess = values;
+        hasPendingEmailInvitation = invitation != null;
         profileName = profile?['full_name'] as String?;
         loadingAccess = false;
-        if (pendingInvitationToken != null) {
+        if (invitation != null) {
+          // Keep the dashboard behind the decision prompt; do not send an
+          // invited teammate into organization creation before they respond.
+          page = AppPage.noOrganization;
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _showInvitationPrompt(invitation),
+          );
+        } else if (pendingInvitationToken != null) {
           page = AppPage.acceptInvitation;
         } else {
           _routeToAvailableAccess(values);
-        }
-        if (invitation != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _showInvitationPrompt(invitation));
         }
       });
     } on PostgrestException catch (_) {
@@ -295,14 +302,15 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   }
 
   Future<void> _showInvitationPrompt(EmailInvitation invitation) async {
-    if (!mounted) return;
+    final dialogContext = _navigatorKey.currentState?.overlay?.context;
+    if (!mounted || dialogContext == null) return;
     final accept = await showDialog<bool>(
-      context: context,
+      context: dialogContext,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.notifications_active_outlined, color: _amber),
-        title: const Text('You have a team invitation'),
-        content: Text('${invitation.businessName} invited you as ${invitation.role}${invitation.stallName == null ? '' : ' for ${invitation.stallName}'}. Would you like to join?'),
+        title: const Text('Restaurant invitation'),
+        content: Text('${invitation.ownerName} from ${invitation.businessName} sent you an invitation as ${invitation.role}${invitation.stallName == null ? '' : ' for ${invitation.stallName}'}. Accept this invitation to activate your role-based access.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Reject')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Accept')),
@@ -313,8 +321,28 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     try {
       await StaffService(_supabase).decideMyEmailInvitation(invitation.id, accept);
       if (mounted) {
-        _notice(context, accept ? 'Invitation accepted. Your role is now active.' : 'Invitation rejected.');
-        await _loadAccess();
+        if (accept) {
+          // PostgREST can briefly return the pre-acceptance membership set
+          // immediately after the RPC commits. Retry locally so staff access
+          // opens without requiring a browser refresh.
+          for (var attempt = 0; attempt < 3 && selectedAccess == null; attempt++) {
+            await _loadAccess();
+            if (selectedAccess == null) {
+              await Future<void>.delayed(const Duration(milliseconds: 350));
+            }
+          }
+        } else {
+          await _loadAccess();
+        }
+        final noticeContext = _navigatorKey.currentState?.overlay?.context;
+        if (noticeContext != null) {
+          _notice(
+            noticeContext,
+            accept
+                ? 'Invitation accepted. Your role is now active.'
+                : 'Invitation rejected.',
+          );
+        }
       }
     } on PostgrestException catch (e) {
       if (mounted) _notice(context, e.message);
@@ -361,6 +389,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'ServeFlow',
+    navigatorKey: _navigatorKey,
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
@@ -465,6 +494,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                 case AppPage.noOrganization:
                   return NoOrganizationPage(
                     userName: profileName,
+                    allowOrganizationCreation: !hasPendingEmailInvitation,
                     onCreateOrganization: () => go(AppPage.createBusiness),
                     onLogout: _signOut,
                   );
