@@ -350,6 +350,8 @@ class AdminPortalPage extends StatefulWidget {
 class _AdminPortalPageState extends State<AdminPortalPage> {
   bool loading = false;
   List<Map<String, dynamic>> restaurants = const [];
+  Map<String, dynamic> overview = const {};
+  String search = '', filter = 'All';
 
   @override
   void initState() { super.initState(); createCode(); }
@@ -357,8 +359,25 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
   Future<void> createCode() async {
     setState(() => loading = true);
     try {
-      final value = await Supabase.instance.client.rpc<List<dynamic>>('list_platform_restaurants');
-      if (mounted) setState(() => restaurants = value.map((row) => Map<String, dynamic>.from(row as Map)).toList());
+      final values = await Supabase.instance.client
+          .rpc<List<dynamic>>('list_platform_restaurants');
+      Map<String, dynamic> nextOverview = const {};
+      try {
+        final rows = await Supabase.instance.client
+            .rpc<List<dynamic>>('platform_admin_overview');
+        if (rows.isNotEmpty) {
+          nextOverview = Map<String, dynamic>.from(rows.first as Map);
+        }
+      } catch (_) {
+        // The existing restaurant list remains available until the optional
+        // reporting migration has been applied to this Supabase project.
+      }
+      if (mounted) setState(() {
+        restaurants = values
+            .map((row) => Map<String, dynamic>.from(row as Map))
+            .toList();
+        overview = nextOverview;
+      });
     } on PostgrestException catch (e) {
       if (mounted) _notice(context, e.message);
     } catch (_) {
@@ -385,6 +404,17 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
                   Text('Platform admin', style: Theme.of(context).textTheme.headlineMedium),
                   const SizedBox(height: 10),
                   Text('${restaurants.length} restaurants registered • ${restaurants.where((r) => r['is_active'] == true).length} active • ${restaurants.where((r) => r['plan'] == 'trial').length} trial • ${restaurants.where((r) => r['plan'] == 'pro').length} Pro • ${restaurants.where((r) => r['is_active'] != true).length} locked'),
+                  const SizedBox(height: 22),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      ('Total', 'total_restaurants'), ('Active', 'active_restaurants'),
+                      ('Trial', 'trial_restaurants'), ('Pro', 'pro_restaurants'),
+                      ('Expired', 'expired_restaurants'), ('Locked', 'locked_restaurants'),
+                      ('Tables', 'total_tables'), ('QR Codes', 'total_qr_codes'), ('Orders', 'total_orders'),
+                    ].map((item) => SizedBox(width: 145, child: _Panel(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item.$1, style: const TextStyle(fontSize: 12)), const SizedBox(height: 6), Text('${overview[item.$2] ?? 0}', style: Theme.of(context).textTheme.headlineMedium)])))).toList(),
+                  ),
                   const SizedBox(height: 28),
                   FilledButton.icon(
                     onPressed: loading ? null : createCode,
@@ -396,7 +426,24 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
                     const SizedBox(height: 24),
                     const Text('Registered restaurants', style: TextStyle(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 8),
-                    ...restaurants.map((r) => ListTile(
+                    TextField(
+                      onChanged: (value) => setState(() => search = value.toLowerCase()),
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Search restaurant, owner, phone or email',
+                      ),
+                    ),
+                    DropdownButton<String>(
+                      value: filter,
+                      items: const ['All', 'trial', 'pro', 'expired']
+                          .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                          .toList(),
+                      onChanged: (value) => setState(() => filter = value!),
+                    ),
+                    ...restaurants.where((r) =>
+                      (filter == 'All' || r['plan'] == filter) &&
+                      '${r['name']} ${r['owner_name']} ${r['phone']} ${r['email']}'.toLowerCase().contains(search)
+                    ).map((r) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(r['name'] as String),
                       subtitle: Text('${r['owner_name'] ?? 'Owner'} • ${r['phone'] ?? ''} • ${r['plan']}'),
