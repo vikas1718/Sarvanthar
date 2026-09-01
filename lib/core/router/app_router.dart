@@ -230,17 +230,21 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       // role is granted automatically. Best-effort: ignored when none matches
       // or the RPC is not deployed yet. Skipped when redeeming a typed token.
       final isAdmin = await _supabase.rpc<bool>('is_platform_admin');
+      if (isAdmin) {
+        if (!mounted) return;
+        setState(() {
+          loadingAccess = false;
+          page = AppPage.adminPortal;
+        });
+        return;
+      }
       if (adminLoginRequested) {
         if (!mounted) return;
         setState(() {
           loadingAccess = false;
-          if (isAdmin) {
-            page = AppPage.adminPortal;
-          } else {
-            adminLoginRequested = false;
-            page = AppPage.login;
-            authError = 'This account does not have platform admin access.';
-          }
+          adminLoginRequested = false;
+          page = AppPage.login;
+          authError = 'This account does not have platform admin access.';
         });
         return;
       }
@@ -505,7 +509,6 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                     onStaff: () => go(AppPage.staffDetails),
                     onSelectStall: (value) =>
                         setState(() => _selectAccess(value)),
-                    onCreateOrganization: () => go(AppPage.createBusiness),
                     onLogout: _signOut,
                   );
                 case AppPage.addStaff:

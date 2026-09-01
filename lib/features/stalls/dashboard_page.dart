@@ -20,7 +20,6 @@ class DashboardPage extends StatelessWidget {
     required this.onAddStaff,
     required this.onStaff,
     required this.onSelectStall,
-    required this.onCreateOrganization,
     required this.onLogout,
   });
   final String section, access, businessName, businessId;
@@ -32,11 +31,11 @@ class DashboardPage extends StatelessWidget {
   final List<BusinessAccess> stallAccess;
   final bool staffRole;
   final ValueChanged<String> onSection;
-  final VoidCallback onAddStaff, onStaff, onCreateOrganization, onLogout;
+  final VoidCallback onAddStaff, onStaff, onLogout;
   final ValueChanged<BusinessAccess> onSelectStall;
   static const items = [
     ('Overview', Icons.grid_view_rounded),
-    ('Business Profile', Icons.business_outlined),
+    ('Business Settings', Icons.business_outlined),
     ('Stalls', Icons.storefront_outlined),
     ('Staff', Icons.groups_2_outlined),
     ('Menu', Icons.menu_book_outlined),
@@ -63,7 +62,6 @@ class DashboardPage extends StatelessWidget {
       stallAccess: stallAccess,
       onSection: onSection,
       onSelectStall: onSelectStall,
-      onCreateOrganization: onCreateOrganization,
       onLogout: onLogout,
     );
     return Scaffold(
@@ -136,7 +134,6 @@ class _Sidebar extends StatelessWidget {
     required this.stallAccess,
     required this.onSection,
     required this.onSelectStall,
-    required this.onCreateOrganization,
     required this.onLogout,
   });
   final String active, access, businessName;
@@ -147,7 +144,7 @@ class _Sidebar extends StatelessWidget {
   final List<BusinessAccess> stallAccess;
   final ValueChanged<String> onSection;
   final ValueChanged<BusinessAccess> onSelectStall;
-  final VoidCallback onCreateOrganization, onLogout;
+  final VoidCallback onLogout;
   @override
   Widget build(BuildContext context) => Container(
     color: _navy,
@@ -225,7 +222,7 @@ class _Sidebar extends StatelessWidget {
               (item) =>
                   (item.$1 != 'Stalls' || (isFoodCourt && !staffRole)) &&
                   (!staffRole ||
-                      (item.$1 != 'Business Profile' && item.$1 != 'Staff')) &&
+                      (item.$1 != 'Business Settings' && item.$1 != 'Staff')) &&
                   (item.$1 != 'Menu' ||
                       [
                         'owner',
@@ -462,7 +459,7 @@ class _DashboardContent extends StatelessWidget {
         userName: userName,
       );
     }
-    if (section == 'Business Profile' && !staffRole) {
+    if (section == 'Business Settings' && !staffRole) {
       return BusinessProfilePage(businessId: businessId);
     }
     if (section == 'Stalls' && isFoodCourt && !staffRole) {

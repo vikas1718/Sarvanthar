@@ -7,7 +7,17 @@ drop function if exists private.is_current_developer();
 drop function if exists public.redeem_current_staff_invitation(text);
 drop table if exists public.developer_codes;
 
-alter table public.profiles rename column is_developer to is_platform_admin;
+-- Safe for both databases that used the prior developer flag and fresh ones.
+alter table public.profiles add column if not exists is_platform_admin boolean not null default false;
+do $$ begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'profiles' and column_name = 'is_developer'
+  ) then
+    execute 'update public.profiles set is_platform_admin = is_developer where is_developer = true';
+    execute 'alter table public.profiles drop column is_developer';
+  end if;
+end $$;
 alter table public.businesses drop column business_code;
 alter table public.businesses
   add column trial_started_at timestamptz not null default now(),
