@@ -164,10 +164,12 @@ class NoOrganizationPage extends StatelessWidget {
     required this.userName,
     required this.onCreateOrganization,
     required this.onLogout,
+    this.allowOrganizationCreation = true,
   });
 
   final String? userName;
   final VoidCallback onCreateOrganization, onLogout;
+  final bool allowOrganizationCreation;
 
   @override
   Widget build(BuildContext context) {
@@ -187,12 +189,13 @@ class NoOrganizationPage extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                _SideItem(
-                  label: 'Create organization',
-                  icon: Icons.add_business_outlined,
-                  selected: true,
-                  onTap: onCreateOrganization,
-                ),
+                if (allowOrganizationCreation)
+                  _SideItem(
+                    label: 'Create organization',
+                    icon: Icons.add_business_outlined,
+                    selected: true,
+                    onTap: onCreateOrganization,
+                  ),
                 const SizedBox(height: 12),
                 ...DashboardPage.items.map(
                   (item) => _SideItem(
@@ -266,14 +269,16 @@ class NoOrganizationPage extends StatelessWidget {
                         const SizedBox(height: 24),
                         Text('Your dashboard is ready', style: Theme.of(context).textTheme.headlineMedium),
                         const SizedBox(height: 10),
-                        const Text('All dashboard sections are visible in the sidebar. Create an organization to unlock orders, staff, menus, tables, reports, and every other feature.'),
-                        const SizedBox(height: 24),
-                        FilledButton.icon(
-                          onPressed: onCreateOrganization,
-                          icon: const Icon(Icons.add_business_outlined),
-                          label: const Text('Create organization'),
-                          style: _primaryStyle(),
-                        ),
+                        Text(allowOrganizationCreation ? 'All dashboard sections are visible in the sidebar. Create an organization to unlock orders, staff, menus, tables, reports, and every other feature.' : 'You have a pending restaurant invitation. Accept it to unlock your assigned role and restaurant access.'),
+                        if (allowOrganizationCreation) ...[
+                          const SizedBox(height: 24),
+                          FilledButton.icon(
+                            onPressed: onCreateOrganization,
+                            icon: const Icon(Icons.add_business_outlined),
+                            label: const Text('Create organization'),
+                            style: _primaryStyle(),
+                          ),
+                        ],
                       ],
                     ),
                   ),

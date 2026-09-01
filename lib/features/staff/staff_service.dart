@@ -60,9 +60,38 @@ class StaffService {
   );
 
   Future<EmailInvitation?> loadMyPendingEmailInvitation() async {
-    final rows = await _client.rpc<List<dynamic>>('get_my_pending_email_invitation');
-    if (rows.isEmpty) return null;
-    return EmailInvitation.fromJson(Map<String, dynamic>.from(rows.first as Map));
+    try {
+      final rows = await _client.rpc<List<dynamic>>(
+        'get_my_pending_email_invitation',
+      );
+      if (rows.isNotEmpty) {
+        return EmailInvitation.fromJson(
+          Map<String, dynamic>.from(rows.first as Map),
+        );
+      }
+    } catch (_) {
+      // Fall through to the recipient-scoped table lookup below.
+    }
+
+    final email = _client.auth.currentUser?.email?.trim().toLowerCase();
+    if (email == null || email.isEmpty) return null;
+    final row = await _client
+        .from('staff_invitations')
+        .select('id, role, business_id, stall_id, created_at')
+        .eq('recipient_email', email)
+        .eq('status', 'invited')
+        .isFilter('accepted_at', null)
+        .gt('expires_at', DateTime.now().toIso8601String())
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    if (row == null) return null;
+    return EmailInvitation(
+      id: row['id'] as String,
+      businessName: 'your restaurant',
+      ownerName: 'The restaurant owner',
+      role: row['role'] as String,
+    );
   }
 
   Future<void> decideMyEmailInvitation(String invitationId, bool accept) =>
