@@ -301,8 +301,8 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.notifications_active_outlined, color: _amber),
-        title: const Text('You have a team invitation'),
-        content: Text('${invitation.businessName} invited you as ${invitation.role}${invitation.stallName == null ? '' : ' for ${invitation.stallName}'}. Would you like to join?'),
+        title: const Text('Restaurant invitation'),
+        content: Text('${invitation.ownerName} from ${invitation.businessName} sent you an invitation as ${invitation.role}${invitation.stallName == null ? '' : ' for ${invitation.stallName}'}. Accept this invitation to activate your role-based access.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Reject')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Accept')),

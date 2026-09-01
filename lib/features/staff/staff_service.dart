@@ -48,9 +48,10 @@ class StaffService {
         'p_expires_in': '7 days',
       },
     );
-    return CreatedInvitation.fromJson(
+    final invitation = CreatedInvitation.fromJson(
       Map<String, dynamic>.from(rows.first as Map),
     );
+    return invitation;
   }
 
   Future<void> revoke(String businessId, String invitationId) => _client.rpc(
