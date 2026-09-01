@@ -154,14 +154,14 @@ class _BusinessProfilePageState extends State<BusinessProfilePage> {
     }
     if (_profile == null) {
       return _PageShell(
-        title: 'Business Profile',
+        title: 'Business Settings',
         subtitle: 'Manage your business information.',
         child: _ErrorPanel(message: _error!, onRetry: _load),
       );
     }
     final profile = _profile!;
     return _PageShell(
-      title: 'Business Profile',
+      title: 'Business Settings',
       subtitle: 'Manage the information associated with your workspace.',
       child: Form(
         key: _formKey,

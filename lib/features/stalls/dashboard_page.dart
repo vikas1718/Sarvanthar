@@ -18,7 +18,6 @@ class DashboardPage extends StatelessWidget {
     required this.onAddStaff,
     required this.onStaff,
     required this.onSelectStall,
-    required this.onCreateOrganization,
     required this.onLogout,
   });
   final String section, access, businessName, businessId;
@@ -29,11 +28,11 @@ class DashboardPage extends StatelessWidget {
   final List<BusinessAccess> stallAccess;
   final bool staffRole;
   final ValueChanged<String> onSection;
-  final VoidCallback onAddStaff, onStaff, onCreateOrganization, onLogout;
+  final VoidCallback onAddStaff, onStaff, onLogout;
   final ValueChanged<BusinessAccess> onSelectStall;
   static const items = [
     ('Overview', Icons.grid_view_rounded),
-    ('Business Profile', Icons.business_outlined),
+    ('Business Settings', Icons.business_outlined),
     ('Stalls', Icons.storefront_outlined),
     ('Staff', Icons.groups_2_outlined),
     ('Menu', Icons.menu_book_outlined),
@@ -58,7 +57,6 @@ class DashboardPage extends StatelessWidget {
       stallAccess: stallAccess,
       onSection: onSection,
       onSelectStall: onSelectStall,
-      onCreateOrganization: onCreateOrganization,
       onLogout: onLogout,
     );
     return Scaffold(
@@ -129,7 +127,6 @@ class _Sidebar extends StatelessWidget {
     required this.stallAccess,
     required this.onSection,
     required this.onSelectStall,
-    required this.onCreateOrganization,
     required this.onLogout,
   });
   final String active, access, businessName;
@@ -139,7 +136,7 @@ class _Sidebar extends StatelessWidget {
   final List<BusinessAccess> stallAccess;
   final ValueChanged<String> onSection;
   final ValueChanged<BusinessAccess> onSelectStall;
-  final VoidCallback onCreateOrganization, onLogout;
+  final VoidCallback onLogout;
   @override
   Widget build(BuildContext context) => Container(
     color: _navy,
@@ -210,7 +207,7 @@ class _Sidebar extends StatelessWidget {
               (item) =>
                   (item.$1 != 'Stalls' || (isFoodCourt && !staffRole)) &&
                   (!staffRole ||
-                      (item.$1 != 'Business Profile' && item.$1 != 'Staff')) &&
+                      (item.$1 != 'Business Settings' && item.$1 != 'Staff')) &&
                   (item.$1 != 'Menu' ||
                       [
                         'owner',
@@ -251,16 +248,6 @@ class _Sidebar extends StatelessWidget {
                 ),
               ),
             ),
-        if (!staffRole)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: _SideItem(
-              label: 'Create organization',
-              icon: Icons.add_business_outlined,
-              selected: false,
-              onTap: onCreateOrganization,
-            ),
-          ),
         const Spacer(),
         Container(
           padding: const EdgeInsets.all(12),
@@ -406,7 +393,7 @@ class _DashboardContent extends StatelessWidget {
     if (section == 'Overview') {
       return _Overview(staffRole: staffRole, onSection: onSection);
     }
-    if (section == 'Business Profile' && !staffRole) {
+    if (section == 'Business Settings' && !staffRole) {
       return BusinessProfilePage(businessId: businessId);
     }
     if (section == 'Stalls' && isFoodCourt && !staffRole) {
@@ -447,8 +434,63 @@ class _DashboardContent extends StatelessWidget {
         role: currentRole,
       );
     }
+    if (section == 'Payments' && currentRole == 'owner') {
+      return const _PaymentsPage();
+    }
     return _Restricted(title: section, staffRole: staffRole);
   }
+}
+
+class _PaymentsPage extends StatelessWidget {
+  const _PaymentsPage();
+
+  @override
+  Widget build(BuildContext context) => _PageShell(
+    title: 'Plans & billing',
+    subtitle: 'Start free for 7 days. Choose a plan when your trial ends.',
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 850;
+        final plans = const [
+          _PlanInfo('Free trial', '7 days', 'Try every ServeFlow feature with no payment required.', true),
+          _PlanInfo('Daily', 'Daily billing', 'Flexible access for busy single-day service.', false),
+          _PlanInfo('Weekly', 'Weekly billing', 'Simple weekly billing for your restaurant team.', false),
+          _PlanInfo('Pro monthly', '₹3,999 / month', 'Full restaurant operations with uninterrupted access.', false),
+        ];
+        return Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: plans.map((plan) => SizedBox(
+            width: narrow ? double.infinity : 260,
+            child: _Panel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(plan.name, style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 12),
+                  Text(plan.price, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: _navy)),
+                  const SizedBox(height: 12),
+                  Text(plan.detail),
+                  const SizedBox(height: 20),
+                  const Row(children: [Icon(Icons.check_circle_outline, color: Colors.green, size: 18), SizedBox(width: 8), Expanded(child: Text('All restaurant features included'))]),
+                  const SizedBox(height: 20),
+                  SizedBox(width: double.infinity, child: plan.current
+                    ? OutlinedButton(onPressed: null, child: const Text('Current plan'))
+                    : FilledButton(onPressed: () => _notice(context, 'Payment checkout will open here.'), style: _primaryStyle(full: true), child: const Text('Choose plan'))),
+                ],
+              ),
+            ),
+          )).toList(),
+        );
+      },
+    ),
+  );
+}
+
+class _PlanInfo {
+  const _PlanInfo(this.name, this.price, this.detail, this.current);
+  final String name, price, detail;
+  final bool current;
 }
 
 class _PageShell extends StatelessWidget {

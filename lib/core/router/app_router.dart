@@ -499,7 +499,6 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                     onStaff: () => go(AppPage.staffDetails),
                     onSelectStall: (value) =>
                         setState(() => _selectAccess(value)),
-                    onCreateOrganization: () => go(AppPage.createBusiness),
                     onLogout: _signOut,
                   );
                 case AppPage.addStaff:
