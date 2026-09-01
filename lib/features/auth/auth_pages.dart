@@ -5,11 +5,11 @@ class AuthShell extends StatelessWidget {
     super.key,
     required this.title,
     required this.subtitle,
-    required this.onBack,
     required this.child,
+    this.onBack,
   });
   final String title, subtitle;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
   final Widget child;
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -24,10 +24,13 @@ class AuthShell extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    IconButton(
-                      onPressed: onBack,
-                      icon: const Icon(Icons.arrow_back_rounded),
-                    ),
+                    if (onBack != null)
+                      IconButton(
+                        onPressed: onBack,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                      )
+                    else
+                      const SizedBox(width: 48),
                     const Spacer(),
                     const Brand(),
                   ],
@@ -146,14 +149,11 @@ class _AccessChoice extends StatelessWidget {
 class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
-    required this.onBack,
     required this.onSignIn,
     required this.onCreateAccount,
-    required this.onAdminLogin,
     required this.loading,
     this.error,
   });
-  final VoidCallback onBack, onAdminLogin;
   final void Function(String email, String password) onSignIn;
   final VoidCallback onCreateAccount;
   final bool loading;
@@ -165,6 +165,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _hidePassword = true;
   @override
   void dispose() {
     _emailController.dispose();
@@ -176,16 +177,10 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) => AuthShell(
     title: 'Welcome back.',
     subtitle: 'Sign in to continue to your workspace.',
-    onBack: widget.onBack,
+    onBack: null,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        OutlinedButton.icon(
-          onPressed: widget.loading ? null : widget.onAdminLogin,
-          icon: const Icon(Icons.admin_panel_settings_outlined),
-          label: const Text('Admin login'),
-        ),
-        const SizedBox(height: 18),
         const _FormLabel('Email address'),
         const SizedBox(height: 8),
         TextField(
@@ -203,12 +198,20 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 8),
         TextField(
           controller: _passwordController,
-          obscureText: true,
+          obscureText: _hidePassword,
           enableSuggestions: false,
           autocorrect: false,
-          decoration: const InputDecoration(
-            prefixIcon: Icon(Icons.lock_outline_rounded),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.lock_outline_rounded),
             hintText: 'Your password',
+            suffixIcon: IconButton(
+              onPressed: () => setState(() => _hidePassword = !_hidePassword),
+              icon: Icon(
+                _hidePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 18),
@@ -232,9 +235,11 @@ class _LoginPageState extends State<LoginPage> {
           _AuthError(message: widget.error!),
         ],
         const SizedBox(height: 16),
-        TextButton(
-          onPressed: widget.loading ? null : widget.onCreateAccount,
-          child: const Text('New to ServeFlow? Create an account'),
+        Center(
+          child: TextButton(
+            onPressed: widget.loading ? null : widget.onCreateAccount,
+            child: const Text("Don't have an account? Create an account"),
+          ),
         ),
       ],
     ),
@@ -250,7 +255,8 @@ class CreateAccountPage extends StatefulWidget {
     this.error,
   });
   final VoidCallback onBack;
-  final void Function(String email, String password) onCreateAccount;
+  final void Function(String fullName, String email, String password)
+      onCreateAccount;
   final bool loading;
   final String? error;
   @override
@@ -258,10 +264,13 @@ class CreateAccountPage extends StatefulWidget {
 }
 
 class _CreateAccountPageState extends State<CreateAccountPage> {
+  final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   String? _validationError;
+  bool _hidePassword = true;
+  bool _hideConfirmPassword = true;
 
   @override
   void dispose() {
@@ -279,6 +288,18 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const _FormLabel('Full name'),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _fullNameController,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.person_outline_rounded),
+            hintText: 'e.g. Aarav Patel',
+          ),
+        ),
+        const SizedBox(height: 16),
         const _FormLabel('Email address'),
         const SizedBox(height: 8),
         TextField(
@@ -316,13 +337,15 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
           onPressed: widget.loading
               ? null
               : () {
+                  final fullName = _fullNameController.text.trim();
                   final email = _emailController.text.trim().toLowerCase();
                   final password = _passwordController.text;
-                  if (!email.contains('@') ||
+                  if (fullName.isEmpty ||
+                      !email.contains('@') ||
                       !email.contains('.') ||
                       password.length < 6) {
                     setState(
-                      () => _validationError = 'Enter a valid email and a password with at least 6 characters.',
+                      () => _validationError = 'Enter your full name, a valid email, and a password with at least 6 characters.',
                     );
                   } else if (password != _confirmPasswordController.text) {
                     setState(
@@ -330,12 +353,19 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                     );
                   } else {
                     setState(() => _validationError = null);
-                    widget.onCreateAccount(email, password);
+                    widget.onCreateAccount(fullName, email, password);
                   }
                 },
           style: _primaryStyle(full: true),
           child: Text(
             widget.loading ? 'Creating account...' : 'Create account',
+          ),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: TextButton(
+            onPressed: widget.loading ? null : widget.onBack,
+            child: const Text("Already have an account? Sign in"),
           ),
         ),
         if (_validationError != null) ...[
@@ -357,11 +387,13 @@ class SetStaffPasswordPage extends StatefulWidget {
     required this.email,
     required this.role,
     required this.onSetPassword,
+    required this.onBack,
     required this.loading,
     this.error,
   });
   final String email, role;
   final ValueChanged<String> onSetPassword;
+  final VoidCallback onBack;
   final bool loading;
   final String? error;
 
@@ -373,6 +405,8 @@ class _SetStaffPasswordPageState extends State<SetStaffPasswordPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   String? _validationError;
+  bool _hidePassword = true;
+  bool _hideConfirmPassword = true;
 
   @override
   void dispose() {
@@ -401,20 +435,42 @@ class _SetStaffPasswordPageState extends State<SetStaffPasswordPage> {
         const SizedBox(height: 8),
         TextField(
           controller: _passwordController,
-          obscureText: true,
+          obscureText: _hidePassword,
           enableSuggestions: false,
           autocorrect: false,
-          decoration: const InputDecoration(hintText: 'At least 6 characters'),
+          decoration: InputDecoration(
+            hintText: 'At least 6 characters',
+            suffixIcon: IconButton(
+              onPressed: () => setState(() => _hidePassword = !_hidePassword),
+              icon: Icon(
+                _hidePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         const _FormLabel('Confirm password'),
         const SizedBox(height: 8),
         TextField(
           controller: _confirmPasswordController,
-          obscureText: true,
+          obscureText: _hideConfirmPassword,
           enableSuggestions: false,
           autocorrect: false,
-          decoration: const InputDecoration(hintText: 'Repeat your password'),
+          decoration: InputDecoration(
+            hintText: 'Repeat your password',
+            suffixIcon: IconButton(
+              onPressed: () => setState(
+                () => _hideConfirmPassword = !_hideConfirmPassword,
+              ),
+              icon: Icon(
+                _hideConfirmPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 22),
         FilledButton(
@@ -436,6 +492,27 @@ class _SetStaffPasswordPageState extends State<SetStaffPasswordPage> {
                 },
           style: _primaryStyle(full: true),
           child: Text(widget.loading ? 'Saving password...' : 'Continue'),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: TextButton(
+            onPressed: widget.loading ? null : widget.onBack,
+            child: const Text("Already have an account? Sign in"),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: TextButton(
+            onPressed: widget.loading ? null : widget.onBack,
+            child: const Text("Already have an account? Sign in"),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: TextButton(
+            onPressed: widget.loading ? null : widget.onBack,
+            child: const Text("Already have an account? Sign in"),
+          ),
         ),
         if (_validationError != null) ...[
           const SizedBox(height: 12),
@@ -472,6 +549,8 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   String? _validationError;
+  bool _hidePassword = true;
+  bool _hideConfirmPassword = true;
 
   @override
   void dispose() {
@@ -503,20 +582,42 @@ class _StaffJoinPageState extends State<StaffJoinPage> {
         const SizedBox(height: 8),
         TextField(
           controller: _passwordController,
-          obscureText: true,
+          obscureText: _hidePassword,
           enableSuggestions: false,
           autocorrect: false,
-          decoration: const InputDecoration(hintText: 'At least 6 characters'),
+          decoration: InputDecoration(
+            hintText: 'At least 6 characters',
+            suffixIcon: IconButton(
+              onPressed: () => setState(() => _hidePassword = !_hidePassword),
+              icon: Icon(
+                _hidePassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         const _FormLabel('Confirm password'),
         const SizedBox(height: 8),
         TextField(
           controller: _confirmPasswordController,
-          obscureText: true,
+          obscureText: _hideConfirmPassword,
           enableSuggestions: false,
           autocorrect: false,
-          decoration: const InputDecoration(hintText: 'Repeat your password'),
+          decoration: InputDecoration(
+            hintText: 'Repeat your password',
+            suffixIcon: IconButton(
+              onPressed: () => setState(
+                () => _hideConfirmPassword = !_hideConfirmPassword,
+              ),
+              icon: Icon(
+                _hideConfirmPassword
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 22),
         FilledButton(
