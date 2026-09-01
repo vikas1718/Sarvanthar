@@ -496,6 +496,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                     selectedStallId: selectedAccess?.stallId,
                     stallName: selectedAccess?.stallName,
                     userName: profileName,
+                    userEmail: _supabase.auth.currentUser?.email,
                     stallAccess: availableAccess
                         .where(
                           (item) =>
