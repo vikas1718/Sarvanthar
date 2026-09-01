@@ -14,6 +14,7 @@ class DashboardPage extends StatelessWidget {
     required this.selectedStallId,
     required this.stallName,
     required this.userName,
+    required this.userEmail,
     required this.stallAccess,
     required this.onSection,
     required this.onAddStaff,
@@ -26,7 +27,7 @@ class DashboardPage extends StatelessWidget {
   final String? businessLogoUrl;
   final String currentRole;
   final String? selectedStallId;
-  final String? stallName, userName;
+  final String? stallName, userName, userEmail;
   final bool isFoodCourt;
   final List<BusinessAccess> stallAccess;
   final bool staffRole;
@@ -44,7 +45,8 @@ class DashboardPage extends StatelessWidget {
     ('Orders', Icons.receipt_long_outlined),
     ('Payments', Icons.payments_outlined),
     ('Reports', Icons.insights_outlined),
-    ('Settings', Icons.settings_outlined),
+    ('Upgrade Plans', Icons.settings_outlined),
+    ('Account Settings', Icons.manage_accounts_outlined),
   ];
   @override
   Widget build(BuildContext context) {
@@ -87,7 +89,7 @@ class DashboardPage extends StatelessWidget {
               child: _DashboardContent(
                 section: section, staffRole: staffRole, isFoodCourt: isFoodCourt,
                 businessId: businessId, businessName: businessName, currentRole: currentRole,
-                selectedStallId: selectedStallId, userName: userName,
+                selectedStallId: selectedStallId, userName: userName, userEmail: userEmail,
                 onSection: onSection, onAddStaff: onAddStaff, onStaff: onStaff,
               ),
             ),
@@ -438,6 +440,7 @@ class _DashboardContent extends StatelessWidget {
     required this.onAddStaff,
     required this.onStaff,
     required this.userName,
+    required this.userEmail,
   });
   final String section;
   final bool staffRole;
@@ -445,6 +448,7 @@ class _DashboardContent extends StatelessWidget {
   final String businessId;
   final String businessName;
   final String? userName;
+  final String? userEmail;
   final String currentRole;
   final String? selectedStallId;
   final ValueChanged<String> onSection;
@@ -482,8 +486,14 @@ class _DashboardContent extends StatelessWidget {
     if (section == 'Tables' && ['owner', 'manager'].contains(currentRole)) {
       return TableManagementPage(businessId: businessId);
     }
-    if (section == 'Settings') {
+    if (section == 'Upgrade Plans') {
       return const _UpgradePlansPage();
+    }
+    if (section == 'Account Settings') {
+      return _AccountSettingsPage(
+        userName: userName,
+        userEmail: userEmail,
+      );
     }
     if (section == 'QR Codes' && ['owner', 'manager'].contains(currentRole)) {
       return QrManagementPage(
@@ -666,6 +676,311 @@ class _PlanCard extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+class _AccountSettingsPage extends StatefulWidget {
+  const _AccountSettingsPage({
+    required this.userName,
+    required this.userEmail,
+  });
+
+  final String? userName;
+  final String? userEmail;
+
+  @override
+  State<_AccountSettingsPage> createState() => _AccountSettingsPageState();
+}
+
+class _AccountSettingsPageState extends State<_AccountSettingsPage> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  final TextEditingController _currentPasswordController =
+      TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(
+      text: widget.userName?.trim().isNotEmpty == true
+          ? widget.userName!.trim()
+          : 'Aparna Patel',
+    );
+    _emailController = TextEditingController(
+      text: widget.userEmail?.trim().isNotEmpty == true
+          ? widget.userEmail!.trim()
+          : 'aparna@example.com',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _PageShell(
+    title: 'Account settings',
+    subtitle: 'Update your personal details and security preferences.',
+    action: FilledButton.icon(
+      onPressed: () => _notice(
+        context,
+        'Profile changes are UI-only right now.',
+      ),
+      style: _primaryStyle(),
+      icon: const Icon(Icons.save_outlined),
+      label: const Text('Save changes'),
+    ),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final twoColumn = constraints.maxWidth >= 920;
+        final profileCard = _Panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Personal details',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Edit how your profile appears across the dashboard.',
+              ),
+              const SizedBox(height: 20),
+              _AccountField(
+                label: 'Full name',
+                controller: _nameController,
+                hintText: 'Enter your full name',
+                prefixIcon: Icons.person_outline_rounded,
+              ),
+              const SizedBox(height: 16),
+              _AccountField(
+                label: 'Email address',
+                controller: _emailController,
+                hintText: 'Enter your email address',
+                keyboardType: TextInputType.emailAddress,
+                prefixIcon: Icons.mail_outline_rounded,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xfffbfaf8),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _line),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: _amber, size: 18),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Changes on this page are visual only until backend actions are connected.',
+                        style: TextStyle(
+                          color: _muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+        final securityCard = _Panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Password',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Create a stronger password for your account access.',
+              ),
+              const SizedBox(height: 20),
+              _AccountField(
+                label: 'Current password',
+                controller: _currentPasswordController,
+                hintText: 'Enter current password',
+                prefixIcon: Icons.lock_outline_rounded,
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              _AccountField(
+                label: 'New password',
+                controller: _newPasswordController,
+                hintText: 'Enter new password',
+                prefixIcon: Icons.key_outlined,
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              _AccountField(
+                label: 'Confirm new password',
+                controller: _confirmPasswordController,
+                hintText: 'Re-enter new password',
+                prefixIcon: Icons.verified_user_outlined,
+                obscureText: true,
+              ),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => _notice(
+                    context,
+                    'Password update is UI-only right now.',
+                  ),
+                  icon: const Icon(Icons.lock_reset_rounded),
+                  label: const Text('Update password'),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        final deleteCard = _Panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.delete_outline_rounded, color: Color(0xffb85b4f)),
+                  SizedBox(width: 10),
+                  Text(
+                    'Delete account',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'This section is for permanent account removal. Keep it behind a confirmation flow when backend support is added.',
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xfffff5f3),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xffffd6d0)),
+                ),
+                child: const Text(
+                  'Deleting your account will remove access to your workspace, profile preferences, and future sign-ins for this user.',
+                  style: TextStyle(
+                    color: Color(0xff8f3d33),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              FilledButton.tonalIcon(
+                onPressed: () => _notice(
+                  context,
+                  'Delete account is disabled in this UI demo.',
+                ),
+                icon: const Icon(Icons.warning_amber_rounded),
+                label: const Text('Delete account'),
+                style: FilledButton.styleFrom(
+                  foregroundColor: const Color(0xff8f3d33),
+                  backgroundColor: const Color(0xffffe4df),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (twoColumn) {
+          return Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 6, child: profileCard),
+                  const SizedBox(width: 18),
+                  Expanded(flex: 5, child: securityCard),
+                ],
+              ),
+              const SizedBox(height: 18),
+              deleteCard,
+            ],
+          );
+        }
+
+        return Column(
+          children: [
+            profileCard,
+            const SizedBox(height: 18),
+            securityCard,
+            const SizedBox(height: 18),
+            deleteCard,
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _AccountField extends StatelessWidget {
+  const _AccountField({
+    required this.label,
+    required this.controller,
+    required this.hintText,
+    required this.prefixIcon,
+    this.obscureText = false,
+    this.keyboardType,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String hintText;
+  final IconData prefixIcon;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(
+          color: _navy,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
+      ),
+      const SizedBox(height: 8),
+      TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          hintText: hintText,
+          prefixIcon: Icon(prefixIcon, size: 20),
+        ),
+      ),
+    ],
   );
 }
 
