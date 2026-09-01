@@ -9,8 +9,16 @@ class AuthService {
     await _client.auth.signInWithPassword(email: email, password: password);
   }
 
-  Future<AuthResponse> createAccount(String email, String password) {
-    return _client.auth.signUp(email: email, password: password);
+  Future<AuthResponse> createAccount(
+    String fullName,
+    String email,
+    String password,
+  ) {
+    return _client.auth.signUp(
+      email: email,
+      password: password,
+      data: {'full_name': fullName},
+    );
   }
 
   Future<void> sendEmailOtp(String email) =>

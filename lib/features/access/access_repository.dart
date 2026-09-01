@@ -9,7 +9,7 @@ class AccessRepository {
   Future<List<BusinessAccess>> loadAccess() async {
     final direct = await _client
         .from('business_memberships')
-        .select('role, businesses!inner(id, name, type)')
+        .select('role, businesses!inner(id, name, type, logo_url)')
         .eq('status', 'active');
     final stall = await _client
         .from('stall_memberships')
@@ -26,6 +26,7 @@ class AccessRepository {
           businessId: business['id'] as String,
           businessName: business['name'] as String,
           businessType: business['type'] as String,
+          businessLogoUrl: business['logo_url'] as String?,
           role: row['role'] as String,
         ),
       );
@@ -40,6 +41,7 @@ class AccessRepository {
           businessId: business['id'] as String,
           businessName: business['name'] as String,
           businessType: business['type'] as String,
+          businessLogoUrl: business['logo_url'] as String?,
           role: row['role'] as String,
           stallId: stallData['id'] as String,
           stallName: stallData['name'] as String,
