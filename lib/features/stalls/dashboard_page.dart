@@ -8,6 +8,7 @@ class DashboardPage extends StatelessWidget {
     required this.access,
     required this.isFoodCourt,
     required this.businessName,
+    required this.businessLogoUrl,
     required this.businessId,
     required this.currentRole,
     required this.selectedStallId,
@@ -22,6 +23,7 @@ class DashboardPage extends StatelessWidget {
     required this.onLogout,
   });
   final String section, access, businessName, businessId;
+  final String? businessLogoUrl;
   final String currentRole;
   final String? selectedStallId;
   final String? stallName, userName;
@@ -53,6 +55,7 @@ class DashboardPage extends StatelessWidget {
       access: access,
       isFoodCourt: isFoodCourt,
       businessName: businessName,
+      businessLogoUrl: businessLogoUrl,
       stallName: stallName,
       userName: userName,
       stallAccess: stallAccess,
@@ -84,7 +87,8 @@ class DashboardPage extends StatelessWidget {
               child: _DashboardContent(
                 section: section, staffRole: staffRole, isFoodCourt: isFoodCourt,
                 businessId: businessId, businessName: businessName, currentRole: currentRole,
-                selectedStallId: selectedStallId, onSection: onSection, onAddStaff: onAddStaff, onStaff: onStaff,
+                selectedStallId: selectedStallId, userName: userName,
+                onSection: onSection, onAddStaff: onAddStaff, onStaff: onStaff,
               ),
             ),
           ),
@@ -124,6 +128,7 @@ class _Sidebar extends StatelessWidget {
     required this.access,
     required this.isFoodCourt,
     required this.businessName,
+    required this.businessLogoUrl,
     required this.stallName,
     required this.userName,
     required this.stallAccess,
@@ -133,6 +138,7 @@ class _Sidebar extends StatelessWidget {
     required this.onLogout,
   });
   final String active, access, businessName;
+  final String? businessLogoUrl;
   final String? stallName, userName;
   final bool staffRole;
   final bool isFoodCourt;
@@ -147,23 +153,26 @@ class _Sidebar extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 10),
-          child: Brand(light: true),
-        ),
-        const SizedBox(height: 43),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11),
-          child: Text(
-            businessName.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              color: Color(0xff9aa5b8),
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.1,
-            ),
+          padding: EdgeInsets.only(left: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _SidebarBrandLogo(logoUrl: businessLogoUrl),
+              SizedBox(width: 10),
+              Text(
+                businessName,
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -.8,
+                ),
+              ),
+            ],
           ),
         ),
+        const SizedBox(height: 43),
         if (stallName != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(11, 0, 11, 12),
@@ -205,7 +214,11 @@ class _Sidebar extends StatelessWidget {
                   ),
           ),
         const SizedBox(height: 11),
-        ...DashboardPage.items
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              ...DashboardPage.items
             .where(
               (item) =>
                   (item.$1 != 'Stalls' || (isFoodCourt && !staffRole)) &&
@@ -251,17 +264,9 @@ class _Sidebar extends StatelessWidget {
                 ),
               ),
             ),
-        if (!staffRole)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: _SideItem(
-              label: 'Create organization',
-              icon: Icons.add_business_outlined,
-              selected: false,
-              onTap: onCreateOrganization,
-            ),
+            ],
           ),
-        const Spacer(),
+        ),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -320,6 +325,47 @@ class _Sidebar extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+}
+
+class _SidebarBrandLogo extends StatelessWidget {
+  const _SidebarBrandLogo({required this.logoUrl});
+
+  final String? logoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = logoUrl?.trim();
+    if (url == null || url.isEmpty) {
+      return _BrandFallbackIcon();
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Image.network(
+        url,
+        width: 34,
+        height: 34,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _BrandFallbackIcon(),
+      ),
+    );
+  }
+}
+
+class _BrandFallbackIcon extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 34,
+    height: 34,
+    decoration: BoxDecoration(
+      color: _amber,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: const Icon(
+      Icons.restaurant_rounded,
+      color: Colors.white,
+      size: 20,
     ),
   );
 }
@@ -391,12 +437,14 @@ class _DashboardContent extends StatelessWidget {
     required this.onSection,
     required this.onAddStaff,
     required this.onStaff,
+    required this.userName,
   });
   final String section;
   final bool staffRole;
   final bool isFoodCourt;
   final String businessId;
   final String businessName;
+  final String? userName;
   final String currentRole;
   final String? selectedStallId;
   final ValueChanged<String> onSection;
@@ -404,7 +452,11 @@ class _DashboardContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (section == 'Overview') {
-      return _Overview(staffRole: staffRole, onSection: onSection);
+      return _Overview(
+        staffRole: staffRole,
+        onSection: onSection,
+        userName: userName,
+      );
     }
     if (section == 'Business Profile' && !staffRole) {
       return BusinessProfilePage(businessId: businessId);
@@ -430,6 +482,9 @@ class _DashboardContent extends StatelessWidget {
     if (section == 'Tables' && ['owner', 'manager'].contains(currentRole)) {
       return TableManagementPage(businessId: businessId);
     }
+    if (section == 'Settings') {
+      return const _UpgradePlansPage();
+    }
     if (section == 'QR Codes' && ['owner', 'manager'].contains(currentRole)) {
       return QrManagementPage(
         businessId: businessId,
@@ -441,15 +496,556 @@ class _DashboardContent extends StatelessWidget {
     }
     if (section == 'Orders' &&
         ['owner', 'manager', 'kitchen', 'cashier'].contains(currentRole)) {
-      return KitchenPage(
-        businessId: businessId,
-        stallId: selectedStallId,
-        role: currentRole,
-      );
+      return const _NewOrderPage();
     }
     return _Restricted(title: section, staffRole: staffRole);
   }
 }
+
+class _UpgradePlansPage extends StatelessWidget {
+  const _UpgradePlansPage();
+
+  @override
+  Widget build(BuildContext context) => _PageShell(
+    title: 'Upgrade plan',
+    subtitle: 'Choose the plan that fits your restaurant today.',
+    child: LayoutBuilder(
+      builder: (context, box) {
+        final wide = box.maxWidth >= 920;
+        final cards = [
+          _PlanCard(
+            name: 'Basic',
+            description: 'For small teams getting started.',
+            price: '₹0',
+            features: const [
+              ('Dashboard access', true),
+              ('Menu management', true),
+              ('Advanced reports', false),
+              ('Priority support', false),
+            ],
+          ),
+          _PlanCard(
+            name: 'Advanced',
+            description: 'For growing restaurants and food courts.',
+            price: '₹1,499',
+            currentPlan: true,
+            features: const [
+              ('Dashboard access', true),
+              ('Menu management', true),
+              ('Advanced reports', true),
+              ('Priority support', false),
+            ],
+          ),
+          _PlanCard(
+            name: 'Enterprise',
+            description: 'For multi-location operations.',
+            price: '₹4,999',
+            features: const [
+              ('Dashboard access', true),
+              ('Menu management', true),
+              ('Advanced reports', true),
+              ('Priority support', true),
+            ],
+          ),
+        ];
+        return Wrap(
+          spacing: 16,
+          runSpacing: 16,
+          children: cards
+              .map(
+                (card) => SizedBox(
+                  width: wide ? (box.maxWidth - 32) / 3 : box.maxWidth,
+                  child: card,
+                ),
+              )
+              .toList(),
+        );
+      },
+    ),
+  );
+}
+
+class _PlanCard extends StatelessWidget {
+  const _PlanCard({
+    required this.name,
+    required this.description,
+    required this.price,
+    required this.features,
+    this.currentPlan = false,
+  });
+
+  final String name;
+  final String description;
+  final String price;
+  final bool currentPlan;
+  final List<(String, bool)> features;
+
+  @override
+  Widget build(BuildContext context) => _Panel(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: _navy,
+                ),
+              ),
+            ),
+            if (currentPlan)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xffffedd5),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: const Text(
+                  'Current Plan',
+                  style: TextStyle(
+                    color: _amber,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(description, style: const TextStyle(color: _muted)),
+        const SizedBox(height: 18),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              price,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(width: 6),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 5),
+              child: Text('/month', style: TextStyle(color: _muted)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        ...features.map(
+          (feature) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              children: [
+                Icon(
+                  feature.$2 ? Icons.check_rounded : Icons.close_rounded,
+                  size: 18,
+                  color: feature.$2 ? const Color(0xff39825c) : const Color(0xffb85b4f),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    feature.$1,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: currentPlan ? null : () => _notice(context, 'Upgrade actions are UI-only for now.'),
+            style: _primaryStyle(full: true),
+            child: Text(currentPlan ? 'Current Plan' : 'Upgrade'),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _NewOrderPage extends StatefulWidget {
+  const _NewOrderPage();
+
+  @override
+  State<_NewOrderPage> createState() => _NewOrderPageState();
+}
+
+class _NewOrderPageState extends State<_NewOrderPage> {
+  String _orderType = 'Dine-in';
+  String? _selectedTable = 'Table 1';
+  final _categories = const ['Starters', 'Mains', 'Beverages', 'Desserts'];
+  late final List<_MockMenuItem> _items = const [
+    _MockMenuItem(
+      category: 'Starters',
+      name: 'Crispy Paneer Bites',
+      price: 220,
+      options: ['Spicy', 'Mild'],
+    ),
+    _MockMenuItem(
+      category: 'Mains',
+      name: 'Veg Thali',
+      price: 340,
+      options: ['Extra rice', 'No onions'],
+    ),
+    _MockMenuItem(
+      category: 'Beverages',
+      name: 'Masala Chai',
+      price: 60,
+      options: ['Less sugar', 'No sugar'],
+    ),
+    _MockMenuItem(
+      category: 'Desserts',
+      name: 'Gulab Jamun',
+      price: 90,
+      options: ['2 pcs', '4 pcs'],
+    ),
+  ];
+  final Map<String, int> _cart = {};
+
+  double get _subtotal {
+    double total = 0;
+    for (final entry in _cart.entries) {
+      final item = _items.firstWhere((e) => e.name == entry.key);
+      total += item.price * entry.value;
+    }
+    return total;
+  }
+
+  double get _tax => _subtotal * 0.05;
+  double get _total => _subtotal + _tax;
+
+  @override
+  Widget build(BuildContext context) => _PageShell(
+    title: 'New Order',
+    subtitle: 'Create a manual order for dine-in or takeaway.',
+    child: LayoutBuilder(
+      builder: (context, box) {
+        final wide = box.maxWidth >= 980;
+        final menuColumn = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _Panel(
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Dine-in'),
+                    selected: _orderType == 'Dine-in',
+                    onSelected: (_) => setState(() {
+                      _orderType = 'Dine-in';
+                      _selectedTable ??= 'Table 1';
+                    }),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Takeaway'),
+                    selected: _orderType == 'Takeaway',
+                    onSelected: (_) => setState(() {
+                      _orderType = 'Takeaway';
+                      _selectedTable = null;
+                    }),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (_orderType == 'Dine-in')
+              _Panel(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedTable,
+                  decoration: const InputDecoration(
+                    labelText: 'Table selector',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Table 1', child: Text('Table 1')),
+                    DropdownMenuItem(value: 'Table 2', child: Text('Table 2')),
+                    DropdownMenuItem(value: 'Table 3', child: Text('Table 3')),
+                  ],
+                  onChanged: (value) => setState(() => _selectedTable = value),
+                ),
+              ),
+            const SizedBox(height: 16),
+            _Panel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Menu categories',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _categories
+                        .map(
+                          (category) => FilterChip(
+                            label: Text(category),
+                            selected: true,
+                            onSelected: (_) {},
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ..._categories.map(
+              (category) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _Panel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._items.where((item) => item.category == category).map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _MenuItemCard(
+                            item: item,
+                            quantity: _cart[item.name] ?? 0,
+                            onAdd: () => setState(() => _cart[item.name] = (_cart[item.name] ?? 0) + 1),
+                            onRemove: () => setState(() {
+                              final next = (_cart[item.name] ?? 0) - 1;
+                              if (next <= 0) {
+                                _cart.remove(item.name);
+                              } else {
+                                _cart[item.name] = next;
+                              }
+                            }),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+
+        final cartColumn = _Panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Selected items',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              if (_cart.isEmpty)
+                const Text('No items selected yet.')
+              else
+                ..._cart.entries.map((entry) {
+                  final item = _items.firstWhere((e) => e.name == entry.key);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(item.name)),
+                        Text('${entry.value} x ${_moneyAmount(item.price)}'),
+                      ],
+                    ),
+                  );
+                }),
+              const Divider(height: 28),
+              _SummaryRow(label: 'Subtotal', value: _moneyAmount(_subtotal)),
+              const SizedBox(height: 8),
+              _SummaryRow(label: 'Tax', value: _moneyAmount(_tax)),
+              const SizedBox(height: 8),
+              _SummaryRow(
+                label: 'Total',
+                value: _moneyAmount(_total),
+                bold: true,
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setState(() {
+                        _cart.clear();
+                        _orderType = 'Dine-in';
+                        _selectedTable = 'Table 1';
+                      }),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => _notice(context, 'Place Order is UI-only for now.'),
+                      style: _primaryStyle(full: true),
+                      child: const Text('Place Order'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+
+        if (wide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 6, child: menuColumn),
+              const SizedBox(width: 18),
+              SizedBox(width: 360, child: cartColumn),
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            menuColumn,
+            const SizedBox(height: 18),
+            cartColumn,
+          ],
+        );
+      },
+    ),
+  );
+}
+
+class _MenuItemCard extends StatelessWidget {
+  const _MenuItemCard({
+    required this.item,
+    required this.quantity,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final _MockMenuItem item;
+  final int quantity;
+  final VoidCallback onAdd;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xfffbfaf8),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: _line),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: const Color(0xffffedd5),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.restaurant_menu_rounded, color: _amber),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(item.name, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text(_moneyAmount(item.price), style: const TextStyle(color: _muted)),
+              if (item.options.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: item.options
+                      .map(
+                        (option) => Chip(
+                          label: Text(option),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      )
+                      .toList(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          children: [
+            IconButton(
+              onPressed: quantity > 0 ? onRemove : null,
+              icon: const Icon(Icons.remove_circle_outline),
+            ),
+            Text('$quantity', style: const TextStyle(fontWeight: FontWeight.w800)),
+            IconButton(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_circle_outline),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+class _SummaryRow extends StatelessWidget {
+  const _SummaryRow({
+    required this.label,
+    required this.value,
+    this.bold = false,
+  });
+
+  final String label;
+  final String value;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+            color: _navy,
+          ),
+        ),
+      ),
+      Text(
+        value,
+        style: TextStyle(
+          fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+          color: _navy,
+        ),
+      ),
+    ],
+  );
+}
+
+class _MockMenuItem {
+  const _MockMenuItem({
+    required this.category,
+    required this.name,
+    required this.price,
+    required this.options,
+  });
+
+  final String category;
+  final String name;
+  final double price;
+  final List<String> options;
+}
+
+String _moneyAmount(double amount) => '₹${amount.toStringAsFixed(0)}';
 
 class _PageShell extends StatelessWidget {
   const _PageShell({
@@ -516,12 +1112,19 @@ class _PageShell extends StatelessWidget {
 }
 
 class _Overview extends StatelessWidget {
-  const _Overview({required this.staffRole, required this.onSection});
+  const _Overview({
+    required this.staffRole,
+    required this.onSection,
+    required this.userName,
+  });
   final bool staffRole;
   final ValueChanged<String> onSection;
+  final String? userName;
   @override
   Widget build(BuildContext c) => _PageShell(
-    title: staffRole ? 'Good afternoon, Aarav.' : 'A clear view of service.',
+    title: userName?.trim().isNotEmpty == true
+        ? 'Welcome back, ${userName!.trim()}.'
+        : 'Welcome back.',
     subtitle: staffRole
         ? 'Kitchen access • Chaat & Co. and South Bowl'
         : 'Sunday, 16 August  •  The Courtyard Food Hall',

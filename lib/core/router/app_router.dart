@@ -8,7 +8,7 @@ class ServeFlowApp extends StatefulWidget {
 }
 
 class _ServeFlowAppState extends State<ServeFlowApp> {
-  AppPage page = AppPage.welcome;
+  AppPage page = AppPage.login;
   String section = 'Overview';
   bool staffRole = false;
   String access = 'Owner access';
@@ -34,7 +34,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
         if (!mounted) return;
         if (state.event == AuthChangeEvent.signedOut) {
           setState(() {
-            page = AppPage.welcome;
+            page = AppPage.login;
             selectedAccess = null;
             availableAccess = const [];
           });
@@ -79,13 +79,17 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     }
   }
 
-  Future<void> _createAccount(String email, String password) async {
+  Future<void> _createAccount(
+    String fullName,
+    String email,
+    String password,
+  ) async {
     setState(() {
       loadingAccess = true;
       authError = null;
     });
     try {
-      final response = await _authService.createAccount(email, password);
+      final response = await _authService.createAccount(fullName, email, password);
       if (response.session == null && mounted) {
         setState(() {
           page = AppPage.login;
@@ -400,27 +404,27 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
             builder: (context) {
               switch (page) {
                 case AppPage.welcome:
-                  return WelcomePage(
-                    onLogin: () => go(AppPage.login),
-                    onSignUp: () => go(AppPage.createAccount),
-                  );
-                case AppPage.access:
-                  return AccessPage(
-                    onBack: () => go(AppPage.welcome),
-                    onLogin: () => go(AppPage.login),
-                    onInvitation: () => go(AppPage.login),
-                  );
-                case AppPage.login:
                   return LoginPage(
-                    onBack: () => go(AppPage.welcome),
                     onSignIn: _signIn,
                     onCreateAccount: () => setState(() {
                       adminLoginRequested = false;
                       page = AppPage.createAccount;
                     }),
-                    onAdminLogin: () => setState(() {
-                      adminLoginRequested = true;
-                      authError = 'Sign in with your platform admin account.';
+                    loading: loadingAccess,
+                    error: authError,
+                  );
+                case AppPage.access:
+                  return AccessPage(
+                    onBack: () => go(AppPage.login),
+                    onLogin: () => go(AppPage.login),
+                    onInvitation: () => go(AppPage.login),
+                  );
+                case AppPage.login:
+                  return LoginPage(
+                    onSignIn: _signIn,
+                    onCreateAccount: () => setState(() {
+                      adminLoginRequested = false;
+                      page = AppPage.createAccount;
                     }),
                     loading: loadingAccess,
                     error: authError,
@@ -482,6 +486,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                     access: access,
                     isFoodCourt: isFoodCourt,
                     businessName: selectedAccess?.businessName ?? '',
+                    businessLogoUrl: selectedAccess?.businessLogoUrl,
                     businessId: selectedAccess?.businessId ?? '',
                     currentRole: selectedAccess?.role ?? '',
                     selectedStallId: selectedAccess?.stallId,

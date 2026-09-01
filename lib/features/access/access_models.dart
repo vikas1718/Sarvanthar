@@ -3,6 +3,7 @@ class BusinessAccess {
     required this.businessId,
     required this.businessName,
     required this.businessType,
+    this.businessLogoUrl,
     required this.role,
     this.stallId,
     this.stallName,
@@ -11,6 +12,7 @@ class BusinessAccess {
   final String businessId;
   final String businessName;
   final String businessType;
+  final String? businessLogoUrl;
   final String role;
   final String? stallId;
   final String? stallName;
