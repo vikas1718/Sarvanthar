@@ -3,13 +3,15 @@ class MenuCategory {
     required this.id,
     required this.name,
     required this.sortOrder,
+    required this.dietaryType,
   });
   factory MenuCategory.fromJson(Map<String, dynamic> j) => MenuCategory(
     id: j['id'] as String,
     name: j['name'] as String,
     sortOrder: j['sort_order'] as int,
+    dietaryType: j['dietary_type'] as String,
   );
-  final String id, name;
+  final String id, name, dietaryType;
   final int sortOrder;
 }
 
@@ -20,6 +22,8 @@ class MenuItem {
     required this.name,
     required this.price,
     required this.available,
+    required this.dietaryType,
+    required this.sortOrder,
     this.description,
     this.imagePath,
   });
@@ -31,10 +35,13 @@ class MenuItem {
     price: (j['price'] as num).toDouble(),
     imagePath: j['image_path'] as String?,
     available: j['is_available'] as bool,
+    dietaryType: j['dietary_type'] as String,
+    sortOrder: j['sort_order'] as int,
   );
-  final String id, categoryId, name;
+  final String id, categoryId, name, dietaryType;
   final String? description, imagePath;
   final double price;
+  final int sortOrder;
   final bool available;
 }
 
