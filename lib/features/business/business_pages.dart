@@ -451,12 +451,14 @@ class _AdminPortalPageState extends State<AdminPortalPage> {
         // The existing restaurant list remains available until the optional
         // reporting migration has been applied to this Supabase project.
       }
-      if (mounted) setState(() {
-        restaurants = values
-            .map((row) => Map<String, dynamic>.from(row as Map))
-            .toList();
-        overview = nextOverview;
-      });
+      if (mounted) {
+        setState(() {
+          restaurants = values
+              .map((row) => Map<String, dynamic>.from(row as Map))
+              .toList();
+          overview = nextOverview;
+        });
+      }
     } on PostgrestException catch (e) {
       if (mounted) _notice(context, e.message);
     } catch (_) {

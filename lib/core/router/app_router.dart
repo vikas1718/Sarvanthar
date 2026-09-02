@@ -354,7 +354,7 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
           await _loadAccess();
         }
         final noticeContext = _navigatorKey.currentState?.overlay?.context;
-        if (noticeContext != null) {
+        if (noticeContext != null && noticeContext.mounted) {
           _notice(
             noticeContext,
             accept
@@ -364,7 +364,8 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
         }
       }
     } on PostgrestException catch (e) {
-      if (mounted) _notice(context, e.message);
+      if (!mounted) return;
+      _notice(context, e.message);
     }
   }
 

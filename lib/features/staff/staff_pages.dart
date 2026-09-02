@@ -101,15 +101,18 @@ class _AccessCheck extends StatefulWidget {
 class _AccessCheckState extends State<_AccessCheck> {
   late bool checked = widget.checked;
   @override
-  Widget build(BuildContext c) => CheckboxListTile(
-    value: checked,
-    onChanged: (v) => setState(() => checked = v ?? false),
-    title: Text(
-      widget.label,
-      style: const TextStyle(fontWeight: FontWeight.w600),
+  Widget build(BuildContext c) => Material(
+    type: MaterialType.transparency,
+    child: CheckboxListTile(
+      value: checked,
+      onChanged: (v) => setState(() => checked = v ?? false),
+      title: Text(
+        widget.label,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
     ),
-    contentPadding: EdgeInsets.zero,
-    controlAffinity: ListTileControlAffinity.leading,
   );
 }
 

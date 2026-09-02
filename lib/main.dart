@@ -46,7 +46,14 @@ part 'features/kitchen/kitchen_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   String? initializationError;
-  if (AppConfig.isConfigured) {
+  try {
+    await AppConfig.load();
+  } catch (_) {
+    initializationError =
+        'Application configuration could not be loaded. Ensure the bundled .env file is present.';
+  }
+
+  if (initializationError == null && AppConfig.isConfigured) {
     try {
       await Supabase.initialize(
         url: AppConfig.supabaseUrl,
@@ -63,7 +70,8 @@ Future<void> main() async {
           'We could not connect to ServeFlow. Please try again later.';
     }
   } else {
-    initializationError = 'Supabase configuration is missing. Start the app with SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY.';
+    initializationError ??=
+        'Supabase configuration is missing. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in .env.';
   }
   runApp(ServeFlowApp(initializationError: initializationError));
 }

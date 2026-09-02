@@ -1,8 +1,26 @@
-import 'dart:js_util' as js_util;
-
-import 'package:js/js.dart';
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'razorpay_checkout_types.dart';
+
+@JS('Razorpay')
+external JSFunction? get _razorpayConstructor;
+
+@JS()
+extension type _RazorpayPaymentResponse._(JSObject _) implements JSObject {
+  @JS('razorpay_payment_id')
+  external JSString? get paymentId;
+}
+
+@JS()
+extension type _RazorpayFailureResponse._(JSObject _) implements JSObject {
+  external _RazorpayError? get error;
+}
+
+@JS()
+extension type _RazorpayError._(JSObject _) implements JSObject {
+  external JSString? get description;
+}
 
 RazorpayCheckout createRazorpayCheckout({
   required RazorpaySuccessCallback onSuccess,
@@ -35,46 +53,33 @@ class _WebRazorpayCheckout implements RazorpayCheckout {
     required String? email,
     required String windowsCheckoutPageUrl,
   }) async {
-    final razorpayConstructor = js_util.getProperty<Object?>(
-      js_util.globalThis,
-      'Razorpay',
-    );
+    final razorpayConstructor = _razorpayConstructor;
     if (razorpayConstructor == null) {
-      throw StateError('Razorpay Checkout failed to load. Please refresh and try again.');
+      throw StateError(
+        'Razorpay Checkout failed to load. Please refresh and try again.',
+      );
     }
 
-    final options = js_util.jsify({
-      'key': keyId,
-      'subscription_id': subscriptionId,
-      'name': 'ServeFlow',
-      'description': 'Basic monthly subscription (Test Mode)',
-      'prefill': {'email': email},
-      'theme': {'color': '#f29a28'},
-    });
-    js_util.setProperty(
-      options,
-      'handler',
-      allowInterop((Object? response) {
-        onSuccess(js_util.getProperty<String?>(response!, 'razorpay_payment_id'));
-      }),
-    );
-    js_util.setProperty(
-      options,
-      'modal',
-      js_util.jsify({
-        'ondismiss': allowInterop(onDismiss),
-      }),
-    );
+    final prefill = JSObject()..['email'] = email?.toJS;
+    final options = JSObject()
+      ..['key'] = keyId.toJS
+      ..['subscription_id'] = subscriptionId.toJS
+      ..['name'] = 'ServeFlow'.toJS
+      ..['description'] = 'Basic monthly subscription (Test Mode)'.toJS
+      ..['prefill'] = prefill
+      ..['theme'] = (JSObject()..['color'] = '#f29a28'.toJS)
+      ..['handler'] = ((_RazorpayPaymentResponse? response) {
+        onSuccess(response?.paymentId?.toDart);
+      }).toJS
+      ..['modal'] = (JSObject()..['ondismiss'] = onDismiss.toJS);
 
-    final checkout = js_util.callConstructor<Object>(razorpayConstructor, [options]);
-    js_util.callMethod<void>(checkout, 'on', [
-      'payment.failed',
-      allowInterop((Object? response) {
-        final error = js_util.getProperty<Object?>(response!, 'error');
-        onError(error == null ? null : js_util.getProperty<String?>(error, 'description'));
-      }),
-    ]);
-    js_util.callMethod<void>(checkout, 'open', const []);
+    final checkout = razorpayConstructor.callAsConstructor<JSObject>(options);
+    checkout.callMethod<JSAny?>('on'.toJS, 'payment.failed'.toJS, ((
+      _RazorpayFailureResponse? response,
+    ) {
+      onError(response?.error?.description?.toDart);
+    }).toJS);
+    checkout.callMethod<JSAny?>('open'.toJS);
   }
 
   @override

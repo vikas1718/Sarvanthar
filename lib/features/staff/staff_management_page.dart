@@ -64,7 +64,7 @@ class _StaffManagementPageState extends State<StaffManagementPage> {
     if (draft == null || !mounted) return;
     setState(() => busy = true);
     try {
-      final created = await service.invite(
+      await service.invite(
         businessId: widget.businessId,
         stallId: draft.stallId,
         role: draft.role,

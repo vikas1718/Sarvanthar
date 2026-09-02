@@ -1,6 +1,6 @@
-flutter run -d web-server --web-port 8080 --dart-define=SUPABASE_URL=https://hynvzfqftvsqqxaaynep.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=YOUR_KEY
-
 # ServeFlow
+
+flutter run -d web-server --web-port 8080
 
 ## Developer-managed organization setup
 
@@ -18,18 +18,18 @@ One deployment serves many businesses. A business is either a **restaurant** (si
 
 ## Status
 
-| Area | State |
-|---|---|
-| Auth, business creation, business/stall selection | Implemented |
-| Business profile (logo, contact, currency, tax) | Implemented |
-| Stall management (food courts) | Implemented |
-| Staff management + invitations | Implemented |
-| Menu management (categories, items, options, images) | Implemented |
-| Table management (dine-in) | Implemented |
-| QR codes (generate, print, regenerate) | Implemented |
-| Kitchen orders (Realtime read + status workflow) | Implemented |
-| Payments, Reports, Settings | **Not started** — nav entries render a placeholder |
-| Customer-facing scan destination | **Not started** — separate Next.js project |
+| Area                                                 | State                                              |
+| ---------------------------------------------------- | -------------------------------------------------- |
+| Auth, business creation, business/stall selection    | Implemented                                        |
+| Business profile (logo, contact, currency, tax)      | Implemented                                        |
+| Stall management (food courts)                       | Implemented                                        |
+| Staff management + invitations                       | Implemented                                        |
+| Menu management (categories, items, options, images) | Implemented                                        |
+| Table management (dine-in)                           | Implemented                                        |
+| QR codes (generate, print, regenerate)               | Implemented                                        |
+| Kitchen orders (Realtime read + status workflow)     | Implemented                                        |
+| Payments, Reports, Settings                          | **Not started** — nav entries render a placeholder |
+| Customer-facing scan destination                     | **Not started** — separate Next.js project         |
 
 ## Getting started
 
@@ -37,13 +37,18 @@ One deployment serves many businesses. A business is either a **restaurant** (si
 flutter pub get
 ```
 
-The app reads its Supabase credentials at compile time and refuses to start without them:
+The app loads its client configuration from the bundled `.env` asset on every
+Flutter target (Windows, Android, iOS, Chrome, and Edge). Set
+`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` there, then run normally:
 
 ```bash
-flutter run \
-  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
-  --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+flutter pub get
+flutter run
 ```
+
+The Supabase anon/publishable key is a public client credential and is safe to
+bundle. Do not put a service-role key, Razorpay key secret, or any server
+credential in `.env`; Razorpay secrets remain Supabase Edge Function secrets.
 
 ### Razorpay subscriptions
 
@@ -60,16 +65,16 @@ Use a plan ID from the same Razorpay account and mode as the key pair (test keys
 supabase db push
 ```
 
-| Define | Required | Default |
-|---|---|---|
-| `SUPABASE_URL` | yes | — |
-| `SUPABASE_PUBLISHABLE_KEY` | yes | — |
-| `QR_SCAN_BASE_URL` | no | `https://scan.serveflow.app` |
+| `.env` variable              | Required     | Default                                     |
+| ---------------------------- | ------------ | ------------------------------------------- |
+| `SUPABASE_URL`               | yes          | —                                           |
+| `SUPABASE_PUBLISHABLE_KEY`   | yes          | —                                           |
+| `QR_SCAN_BASE_URL`           | no           | `https://scan.serveflow.app`                |
 | `RAZORPAY_CHECKOUT_PAGE_URL` | Windows only | Hosted URL for `web/razorpay_checkout.html` |
 
 `QR_SCAN_BASE_URL` is the origin printed into QR codes. It points at a placeholder until the customer-facing app exists. Only the origin changes when that ships, so codes printed today keep working.
 
-For Windows builds, deploy the Flutter web output with `web/razorpay_checkout.html` at the configured URL, then build with that URL. For example, if the web app is hosted at `https://app.example.com`, use `--dart-define=RAZORPAY_CHECKOUT_PAGE_URL=https://app.example.com/razorpay_checkout.html`. The host must be enabled for the Razorpay key in the Razorpay Dashboard.
+For Windows builds, deploy the Flutter web output with `web/razorpay_checkout.html` at the configured URL, then set `RAZORPAY_CHECKOUT_PAGE_URL=https://app.example.com/razorpay_checkout.html` in `.env`. The host must be enabled for the Razorpay key in the Razorpay Dashboard.
 
 Requires Dart SDK `^3.13.0`.
 
@@ -86,7 +91,7 @@ Consequences worth knowing before you add a file:
 ```
 lib/
   core/
-    config/app_config.dart        compile-time defines
+    config/app_config.dart        bundled .env configuration
     router/app_router.dart        page enum + auth-driven navigation
     widgets/shared_widgets.dart   design tokens, shared chrome
   features/
@@ -109,24 +114,24 @@ Roles: `owner`, `manager`, `kitchen`, `cashier`, `staff`. One owner per business
 
 Sidebar visibility, as implemented:
 
-| Section | owner | manager | kitchen | cashier | staff |
-|---|:-:|:-:|:-:|:-:|:-:|
-| Overview | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Business Profile | ✅ | — | — | — | — |
-| Stalls *(food court only)* | ✅ | — | — | — | — |
-| Staff | ✅ | — | — | — | — |
-| Menu | ✅ | ✅ | ✅ | — | — |
-| Tables | ✅ | ✅ | — | — | — |
-| QR Codes | ✅ | ✅ | — | — | — |
-| Orders | ✅ | ✅ | ✅ | ✅ | — |
-| Payments / Reports / Settings | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Section                       | owner | manager | kitchen | cashier | staff |
+| ----------------------------- | :---: | :-----: | :-----: | :-----: | :---: |
+| Overview                      |  ✅   |   ✅    |   ✅    |   ✅    |  ✅   |
+| Business Profile              |  ✅   |    —    |    —    |    —    |   —   |
+| Stalls _(food court only)_    |  ✅   |    —    |    —    |    —    |   —   |
+| Staff                         |  ✅   |    —    |    —    |    —    |   —   |
+| Menu                          |  ✅   |   ✅    |   ✅    |    —    |   —   |
+| Tables                        |  ✅   |   ✅    |    —    |    —    |   —   |
+| QR Codes                      |  ✅   |   ✅    |    —    |    —    |   —   |
+| Orders                        |  ✅   |   ✅    |   ✅    |   ✅    |   —   |
+| Payments / Reports / Settings |  ✅   |   ✅    |   ✅    |   ✅    |  ✅   |
 
 Payments, Reports, and Settings currently render placeholders. Orders opens the
 Realtime Kitchen queue for Owner, Manager, Kitchen, and Cashier roles.
 
 **Client-side gating is cosmetic.** Every rule above is enforced again in Postgres via RLS policies and `security definer` RPCs that check `auth.uid()`. Helpers live in the `private` schema: `is_business_owner`, `has_business_access`, `has_stall_access`, `can_manage_menu`, `can_manage_tables`, `can_manage_qr_tokens`.
 
-One subtlety if you add an RLS policy that calls a `private` helper: policy expressions evaluate with the *querying* role's privileges, so that helper needs `grant execute ... to authenticated`. Helpers called only from inside `security definer` bodies don't.
+One subtlety if you add an RLS policy that calls a `private` helper: policy expressions evaluate with the _querying_ role's privileges, so that helper needs `grant execute ... to authenticated`. Helpers called only from inside `security definer` bodies don't.
 
 ## Database
 
@@ -144,7 +149,7 @@ supabase/
 
 `supabase/proposals/` is a deliberate convention: schema changes are drafted there with a `-- REVIEW ONLY` header, reviewed, then moved into `migrations/` unchanged and pushed. Don't apply a proposal without approval, and don't edit a migration that has already been applied — write a corrective one.
 
-`anon` is locked out of the `public` schema wholesale (`revoke all on all tables/functions ... from anon`). Note that Supabase's default privileges grant *new* public-schema tables to `anon`, so a new table needs its own explicit `revoke` — an earlier blanket revoke does not cover it.
+`anon` is locked out of the `public` schema wholesale (`revoke all on all tables/functions ... from anon`). Note that Supabase's default privileges grant _new_ public-schema tables to `anon`, so a new table needs its own explicit `revoke` — an earlier blanket revoke does not cover it.
 
 ## QR codes
 
@@ -164,10 +169,10 @@ It is read-only, `security definer` (so `anon` holds no direct privilege on `qr_
 
 Resolution failures are deliberately distinguishable, so support can tell a reissued code from a bad one:
 
-| Message | Cause |
-|---|---|
-| `QR code is not valid` | malformed, or no such token |
-| `QR code has been replaced` | token was retired by regeneration |
+| Message                       | Cause                                                    |
+| ----------------------------- | -------------------------------------------------------- |
+| `QR code is not valid`        | malformed, or no such token                              |
+| `QR code has been replaced`   | token was retired by regeneration                        |
 | `QR code is no longer active` | token is live, but its target is archived or deactivated |
 
 **Before launch:** add a rate limit to this endpoint. It is the only unauthenticated entry point in the system.
@@ -183,6 +188,7 @@ The Flutter UI is compile-checked only. QR image rendering and the PDF print/dow
 ```bash
 flutter analyze
 ```
+
 See [AUTH_TESTING.md](AUTH_TESTING.md) for the manual authentication and authorization test checklist.
 
 ## Pre-launch checklist
