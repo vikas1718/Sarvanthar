@@ -9,18 +9,19 @@ class AccessRepository {
   Future<List<BusinessAccess>> loadAccess() async {
     final direct = await _client
         .from('business_memberships')
-        .select('role, businesses!inner(id, name, type, logo_url)')
+        .select('role, businesses!inner(id, name, type, logo_url, is_deleted)')
         .eq('status', 'active');
     final stall = await _client
         .from('stall_memberships')
         .select(
-          'role, stalls!inner(id, name, businesses!inner(id, name, type))',
+          'role, stalls!inner(id, name, businesses!inner(id, name, type, is_deleted))',
         )
         .eq('status', 'active');
 
     final results = <BusinessAccess>[];
     for (final row in List<Map<String, dynamic>>.from(direct)) {
       final business = Map<String, dynamic>.from(row['businesses'] as Map);
+      if (business['is_deleted'] == true) continue;
       results.add(
         BusinessAccess(
           businessId: business['id'] as String,
@@ -36,6 +37,7 @@ class AccessRepository {
       final business = Map<String, dynamic>.from(
         stallData['businesses'] as Map,
       );
+      if (business['is_deleted'] == true) continue;
       results.add(
         BusinessAccess(
           businessId: business['id'] as String,

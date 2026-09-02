@@ -84,6 +84,8 @@ class DashboardPage extends StatelessWidget {
           Expanded(
             child: _SubscriptionGate(
               businessId: businessId,
+              onUpgrade: () => onSection('Upgrade Plans'),
+              allowWhenExpired: section == 'Upgrade Plans',
               child: _DashboardContent(
                 section: section,
                 staffRole: staffRole,
@@ -107,8 +109,15 @@ class DashboardPage extends StatelessWidget {
 }
 
 class _SubscriptionGate extends StatelessWidget {
-  const _SubscriptionGate({required this.businessId, required this.child});
+  const _SubscriptionGate({
+    required this.businessId,
+    required this.onUpgrade,
+    required this.allowWhenExpired,
+    required this.child,
+  });
   final String businessId;
+  final VoidCallback onUpgrade;
+  final bool allowWhenExpired;
   final Widget child;
   @override
   Widget build(BuildContext context) => FutureBuilder<List<dynamic>>(
@@ -146,12 +155,12 @@ class _SubscriptionGate extends StatelessWidget {
           ],
         );
       }
+      if (allowWhenExpired) return child;
       return _PageShell(
         title: 'Your free trial has expired',
         subtitle: 'Your restaurant features are locked. Upgrade to Pro to restore full access.',
         child: FilledButton(
-          onPressed: () =>
-              _notice(context, 'Pro upgrades will be available here.'),
+          onPressed: onUpgrade,
           style: _primaryStyle(),
           child: const Text('Upgrade to Pro'),
         ),
@@ -515,7 +524,7 @@ class _DashboardContent extends StatelessWidget {
       return TableManagementPage(businessId: businessId);
     }
     if (section == 'Upgrade Plans') {
-      return const _UpgradePlansPage();
+      return _UpgradePlansPage(businessId: businessId);
     }
     if (section == 'Account Settings') {
       return _AccountSettingsPage(userName: userName, userEmail: userEmail);
@@ -537,11 +546,128 @@ class _DashboardContent extends StatelessWidget {
   }
 }
 
-class _UpgradePlansPage extends StatelessWidget {
-  const _UpgradePlansPage();
+class _UpgradePlansPage extends StatefulWidget {
+  const _UpgradePlansPage({required this.businessId});
+
+  final String businessId;
 
   // Keep pricing in one place until subscription billing is implemented.
   static const _basicMonthlyPrice = '₹200';
+
+  @override
+  State<_UpgradePlansPage> createState() => _UpgradePlansPageState();
+}
+
+class _UpgradePlansPageState extends State<_UpgradePlansPage> {
+  bool _isCreatingSubscription = false;
+  late final RazorpayCheckout _checkout;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkout = createRazorpayCheckout(
+      onSuccess: _handlePaymentSuccess,
+      onError: _handlePaymentError,
+      onExternalWallet: _handleExternalWallet,
+      onDismiss: _handleCheckoutDismissed,
+    );
+  }
+
+  @override
+  void dispose() {
+    _checkout.dispose();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(String? paymentId) {
+    debugPrint('Razorpay Checkout success: $paymentId');
+    _notice(
+      context,
+      'Test payment completed. Subscription confirmation is pending.',
+    );
+  }
+
+  void _handlePaymentError(String? message) {
+    debugPrint('Razorpay Checkout failed: $message');
+    _notice(context, 'Checkout was closed or the test payment failed.');
+  }
+
+  void _handleExternalWallet(String? walletName) {
+    debugPrint('Razorpay external wallet selected: $walletName');
+    _notice(
+      context,
+      'External wallet selected: ${walletName ?? 'unknown'}.',
+    );
+  }
+
+  void _handleCheckoutDismissed() {
+    _notice(context, 'Checkout was closed or the test payment failed.');
+  }
+
+  Future<void> _openCheckout({
+    required String subscriptionId,
+    required String keyId,
+  }) {
+    return _checkout.open(
+      subscriptionId: subscriptionId,
+      keyId: keyId,
+      email: Supabase.instance.client.auth.currentUser?.email,
+      windowsCheckoutPageUrl: AppConfig.razorpayCheckoutPageUrl,
+    );
+  }
+
+  Future<void> _subscribe() async {
+    if (_isCreatingSubscription) return;
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      _notice(context, 'Please sign in again before subscribing.');
+      return;
+    }
+    setState(() => _isCreatingSubscription = true);
+    try {
+      final result = await Supabase.instance.client.functions.invoke(
+        'create-razorpay-subscription',
+        body: {'business_id': widget.businessId},
+      );
+      final data = result.data;
+      final subscriptionId = data is Map ? data['subscription_id'] : null;
+      if (subscriptionId is! String || subscriptionId.isEmpty) {
+        throw StateError(
+          'The subscription response did not include subscription_id.',
+        );
+      }
+      final keyId = data is Map ? data['key_id'] : null;
+      if (keyId is! String || keyId.isEmpty) {
+        throw StateError('The subscription response did not include key_id.');
+      }
+      debugPrint('Razorpay test subscription created: $subscriptionId');
+      await _openCheckout(subscriptionId: subscriptionId, keyId: keyId);
+    } on FunctionException catch (error) {
+      debugPrint('Razorpay subscription creation failed: $error');
+      if (mounted) _notice(context, _subscriptionErrorMessage(error));
+    } on StateError catch (error) {
+      debugPrint('Razorpay Checkout could not open: $error');
+      if (mounted) _notice(context, error.message.toString());
+    } catch (error) {
+      debugPrint('Razorpay subscription creation failed: $error');
+      if (mounted) {
+        _notice(context, 'Could not create the subscription. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _isCreatingSubscription = false);
+    }
+  }
+
+  String _subscriptionErrorMessage(FunctionException error) {
+    final details = error.details;
+    if (details is Map && details['error'] is String) {
+      return details['error'] as String;
+    }
+    if (error.status == 0) {
+      return 'Could not reach the subscription service. Check your connection and try again.';
+    }
+    return 'Could not create the subscription. Please try again.';
+  }
 
   @override
   Widget build(BuildContext context) => _PageShell(
@@ -581,6 +707,7 @@ class _UpgradePlansPage extends StatelessWidget {
                   ('Staff management', true),
                   ('After trial', true),
                 ],
+                onSubscribe: _subscribe,
               ),
               _PlanCard(
                 name: 'ADVANCED',
@@ -638,12 +765,14 @@ class _PlanCard extends StatelessWidget {
     required this.description,
     required this.price,
     required this.features,
+    this.onSubscribe,
   });
 
   final String name;
   final String description;
   final String price;
   final List<(String, bool)> features;
+  final VoidCallback? onSubscribe;
 
   @override
   Widget build(BuildContext context) {
@@ -723,8 +852,12 @@ class _PlanCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: () =>
-                    _notice(context, 'Upgrade actions are UI-only for now.'),
+                onPressed: isBasic
+                    ? onSubscribe
+                    : () => _notice(
+                        context,
+                        'Upgrade actions are UI-only for now.',
+                      ),
                 style: _primaryStyle(full: true),
                 child: Text(name == 'ENTERPRISE' ? 'Contact Us' : 'Subscribe'),
               ),

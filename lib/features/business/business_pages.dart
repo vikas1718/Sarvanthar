@@ -339,6 +339,85 @@ class SuccessPage extends StatelessWidget {
   );
 }
 
+class ChoosePlanPage extends StatelessWidget {
+  const ChoosePlanPage({super.key, required this.onSelect});
+
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) => AuthShell(
+    title: 'Choose your plan',
+    subtitle: 'Pick how you would like to get started with ServeFlow.',
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PlanChoice(
+          title: '7-Day Free Trial',
+          detail: 'All features included',
+          action: 'Start Free Trial',
+          onPressed: onSelect,
+        ),
+        const SizedBox(height: 12),
+        _PlanChoice(
+          title: 'Basic',
+          detail: '₹200/month',
+          action: 'Choose Basic',
+          onPressed: onSelect,
+        ),
+        const SizedBox(height: 12),
+        const _PlanChoice(
+          title: 'Advanced',
+          detail: 'Coming soon',
+          action: 'Coming Soon',
+        ),
+        const SizedBox(height: 12),
+        _PlanChoice(
+          title: 'Enterprise',
+          detail: 'Custom pricing',
+          action: 'Contact Us',
+          onPressed: onSelect,
+        ),
+      ],
+    ),
+  );
+}
+
+class _PlanChoice extends StatelessWidget {
+  const _PlanChoice({
+    required this.title,
+    required this.detail,
+    required this.action,
+    this.onPressed,
+  });
+
+  final String title, detail, action;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => _Panel(
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: _navy)),
+              const SizedBox(height: 4),
+              Text(detail, style: const TextStyle(color: _muted)),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        FilledButton(
+          onPressed: onPressed,
+          style: _primaryStyle(),
+          child: Text(action),
+        ),
+      ],
+    ),
+  );
+}
+
 class AdminPortalPage extends StatefulWidget {
   const AdminPortalPage({super.key, required this.onLogout});
   final VoidCallback onLogout;

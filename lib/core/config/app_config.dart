@@ -23,6 +23,13 @@ class AppConfig {
     defaultValue: 'https://scan.serveflow.app',
   );
 
+  /// Hosted copy of web/razorpay_checkout.html used by the Windows app.
+  /// Configure this in Windows release builds; the page must be served over
+  /// HTTPS from an origin enabled for the Razorpay key.
+  static const razorpayCheckoutPageUrl = String.fromEnvironment(
+    'RAZORPAY_CHECKOUT_PAGE_URL',
+  );
+
   static bool get isConfigured =>
       supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty;
 

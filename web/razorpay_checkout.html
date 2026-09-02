@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ServeFlow subscription checkout</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <p id="message">Opening secure Razorpay Checkout…</p>
+  <script>
+    (function () {
+      const message = document.getElementById('message');
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      const key = params.get('key_id');
+      const subscriptionId = params.get('subscription_id');
+      if (!key || !subscriptionId) {
+        message.textContent = 'Missing Razorpay Checkout details.';
+        return;
+      }
+
+      const options = {
+        key: key,
+        subscription_id: subscriptionId,
+        name: 'ServeFlow',
+        description: 'Basic monthly subscription (Test Mode)',
+        prefill: { email: params.get('email') || undefined },
+        theme: { color: '#f29a28' },
+        handler: function () {
+          message.textContent = 'Payment submitted. Subscription confirmation is pending.';
+        },
+        modal: {
+          ondismiss: function () {
+            message.textContent = 'Checkout closed. You can return to ServeFlow.';
+          }
+        }
+      };
+      const checkout = new Razorpay(options);
+      checkout.on('payment.failed', function () {
+        message.textContent = 'Payment failed. You can return to ServeFlow and try again.';
+      });
+      checkout.open();
+    })();
+  </script>
+</body>
+</html>

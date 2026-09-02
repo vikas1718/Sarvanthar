@@ -27,6 +27,7 @@ import 'features/qr/qr_service.dart';
 import 'features/qr/qr_token.dart';
 import 'features/kitchen/kitchen_order.dart';
 import 'features/kitchen/kitchen_service.dart';
+import 'features/payments/razorpay_checkout.dart';
 
 part 'core/router/app_router.dart';
 part 'core/widgets/shared_widgets.dart';
