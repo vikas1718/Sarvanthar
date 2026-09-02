@@ -269,8 +269,8 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   String? _validationError;
-  bool _hidePassword = true;
-  bool _hideConfirmPassword = true;
+  final bool _hidePassword = true;
+  final bool _hideConfirmPassword = true;
 
   @override
   void dispose() {
