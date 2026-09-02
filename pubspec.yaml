@@ -13,7 +13,10 @@ dependencies:
   pdf: ^3.11.3
   printing: ^5.15.0
   qr_flutter: ^4.1.0
+  razorpay_flutter: ^1.4.5
   supabase_flutter: ^2.16.0
+  url_launcher: ^6.3.2
+  js: ^0.7.2
 
 dev_dependencies:
   flutter_test:
