@@ -45,13 +45,31 @@ flutter run \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
+### Razorpay subscriptions
+
+The `create-razorpay-subscription` Edge Function must be deployed and configured in the same Supabase project as the app. Keep Razorpay credentials out of the Flutter `.env` file: they are server secrets.
+
+```bash
+supabase functions deploy create-razorpay-subscription
+supabase secrets set RAZORPAY_KEY_ID=rzp_test_... RAZORPAY_KEY_SECRET=... RAZORPAY_PLAN_ID=plan_...
+```
+
+Use a plan ID from the same Razorpay account and mode as the key pair (test keys with a test plan, or live keys with a live plan). Apply migration `20260901000300_razorpay_subscription_metadata.sql` before enabling the button:
+
+```bash
+supabase db push
+```
+
 | Define | Required | Default |
 |---|---|---|
 | `SUPABASE_URL` | yes | — |
 | `SUPABASE_PUBLISHABLE_KEY` | yes | — |
 | `QR_SCAN_BASE_URL` | no | `https://scan.serveflow.app` |
+| `RAZORPAY_CHECKOUT_PAGE_URL` | Windows only | Hosted URL for `web/razorpay_checkout.html` |
 
 `QR_SCAN_BASE_URL` is the origin printed into QR codes. It points at a placeholder until the customer-facing app exists. Only the origin changes when that ships, so codes printed today keep working.
+
+For Windows builds, deploy the Flutter web output with `web/razorpay_checkout.html` at the configured URL, then build with that URL. For example, if the web app is hosted at `https://app.example.com`, use `--dart-define=RAZORPAY_CHECKOUT_PAGE_URL=https://app.example.com/razorpay_checkout.html`. The host must be enabled for the Razorpay key in the Razorpay Dashboard.
 
 Requires Dart SDK `^3.13.0`.
 

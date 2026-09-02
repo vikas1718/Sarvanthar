@@ -135,6 +135,9 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
         },
       );
       await _loadAccess();
+      if (mounted) {
+        setState(() => page = AppPage.choosePlan);
+      }
     } on PostgrestException catch (_) {
       if (mounted) {
         setState(
@@ -301,6 +304,22 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
     return values.where((value) => seen.add(value.businessId)).toList();
   }
 
+  BusinessAccess? _resolveSelectedAccess(List<BusinessAccess> values) {
+    final current = selectedAccess;
+    if (current == null) return null;
+    for (final value in values) {
+      if (value.businessId == current.businessId &&
+          value.stallId == current.stallId &&
+          value.role == current.role) {
+        return value;
+      }
+    }
+    for (final value in values) {
+      if (value.businessId == current.businessId) return value;
+    }
+    return null;
+  }
+
   Future<void> _showInvitationPrompt(EmailInvitation invitation) async {
     final dialogContext = _navigatorKey.currentState?.overlay?.context;
     if (!mounted || dialogContext == null) return;
@@ -350,9 +369,14 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
   }
 
   void _routeToAvailableAccess(List<BusinessAccess> values) {
-    if (values.isEmpty) {
+    final resolved = _resolveSelectedAccess(values);
+    if (resolved != null) {
+      _selectAccess(resolved);
+    } else if (values.isEmpty) {
+      selectedAccess = null;
       page = AppPage.noOrganization;
     } else if (_distinctBusinesses(values).length > 1) {
+      selectedAccess = null;
       page = AppPage.businessSelect;
     } else {
       _selectAccess(values.first);
@@ -502,6 +526,10 @@ class _ServeFlowAppState extends State<ServeFlowApp> {
                   return AdminPortalPage(onLogout: _signOut);
                 case AppPage.success:
                   return SuccessPage(onOpen: () => go(AppPage.dashboard));
+                case AppPage.choosePlan:
+                  return ChoosePlanPage(
+                    onSelect: () => go(AppPage.dashboard),
+                  );
                 case AppPage.businessSelect:
                   return BusinessSelectPage(
                     access: _distinctBusinesses(availableAccess),
@@ -589,6 +617,7 @@ enum AppPage {
   staffOtp,
   createBusiness,
   success,
+  choosePlan,
   businessSelect,
   dashboard,
   addStaff,
