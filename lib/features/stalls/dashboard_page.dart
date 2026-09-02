@@ -754,6 +754,9 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
+  bool _savingProfile = false;
+  bool _updatingPassword = false;
+  bool _deletingAccount = false;
 
   @override
   void initState() {
@@ -780,16 +783,120 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
     super.dispose();
   }
 
+  Future<void> _saveProfile(BuildContext context) async {
+    final newName = _nameController.text.trim();
+    final newEmail = _emailController.text.trim();
+    if (newName.isEmpty) {
+      _notice(context, 'Full name cannot be empty.');
+      return;
+    }
+    setState(() => _savingProfile = true);
+    try {
+      final client = Supabase.instance.client;
+      final uid = client.auth.currentUser!.id;
+      await client.from('profiles').update({'full_name': newName}).eq('id', uid);
+      final currentEmail = client.auth.currentUser?.email;
+      if (newEmail.isNotEmpty && newEmail != currentEmail) {
+        await client.auth.updateUser(UserAttributes(email: newEmail));
+        if (context.mounted) {
+          _notice(context, 'Profile saved. Check your inbox to confirm the new email.');
+        }
+      } else if (context.mounted) {
+        _notice(context, 'Profile saved.');
+      }
+    } catch (e) {
+      if (context.mounted) _notice(context, 'Could not save profile: $e');
+    } finally {
+      if (mounted) setState(() => _savingProfile = false);
+    }
+  }
+
+  Future<void> _updatePassword(BuildContext context) async {
+    final current = _currentPasswordController.text;
+    final next = _newPasswordController.text;
+    final confirm = _confirmPasswordController.text;
+    if (current.isEmpty || next.isEmpty || confirm.isEmpty) {
+      _notice(context, 'Fill in all three password fields.');
+      return;
+    }
+    if (next != confirm) {
+      _notice(context, 'New password and confirmation do not match.');
+      return;
+    }
+    if (next.length < 8) {
+      _notice(context, 'New password must be at least 8 characters.');
+      return;
+    }
+    setState(() => _updatingPassword = true);
+    try {
+      final client = Supabase.instance.client;
+      final email = client.auth.currentUser?.email;
+      if (email == null) throw Exception('No signed-in user.');
+      await client.auth.signInWithPassword(email: email, password: current);
+      await client.auth.updateUser(UserAttributes(password: next));
+      if (context.mounted) {
+        _currentPasswordController.clear();
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+        _notice(context, 'Password updated.');
+      }
+    } catch (e) {
+      if (context.mounted) _notice(context, 'Could not update password: $e');
+    } finally {
+      if (mounted) setState(() => _updatingPassword = false);
+    }
+  }
+
+  Future<void> _deleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This permanently removes your access, profile, and sign-in for this user. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xffb85b4f)),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _deletingAccount = true);
+    try {
+      await Supabase.instance.client.rpc('delete_own_account');
+      await Supabase.instance.client.auth.signOut();
+    } catch (e) {
+      if (context.mounted) {
+        _notice(context, 'Could not delete account: $e');
+        setState(() => _deletingAccount = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => _PageShell(
     title: 'Account settings',
     subtitle: 'Update your personal details and security preferences.',
     action: FilledButton.icon(
-      onPressed: () =>
-          _notice(context, 'Profile changes are UI-only right now.'),
+      onPressed: _savingProfile ? null : () => _saveProfile(context),
       style: _primaryStyle(),
-      icon: const Icon(Icons.save_outlined),
-      label: const Text('Save changes'),
+      icon: _savingProfile
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            )
+          : const Icon(Icons.save_outlined),
+      label: Text(_savingProfile ? 'Saving...' : 'Save changes'),
     ),
     child: LayoutBuilder(
       builder: (context, constraints) {
@@ -887,10 +994,15 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
-                  onPressed: () =>
-                      _notice(context, 'Password update is UI-only right now.'),
-                  icon: const Icon(Icons.lock_reset_rounded),
-                  label: const Text('Update password'),
+                  onPressed: _updatingPassword ? null : () => _updatePassword(context),
+                  icon: _updatingPassword
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.lock_reset_rounded),
+                  label: Text(_updatingPassword ? 'Updating...' : 'Update password'),
                 ),
               ),
             ],
@@ -934,12 +1046,15 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
               ),
               const SizedBox(height: 18),
               FilledButton.tonalIcon(
-                onPressed: () => _notice(
-                  context,
-                  'Delete account is disabled in this UI demo.',
-                ),
-                icon: const Icon(Icons.warning_amber_rounded),
-                label: const Text('Delete account'),
+                onPressed: _deletingAccount ? null : () => _deleteAccount(context),
+                icon: _deletingAccount
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.warning_amber_rounded),
+                label: Text(_deletingAccount ? 'Deleting...' : 'Delete account'),
                 style: FilledButton.styleFrom(
                   foregroundColor: const Color(0xff8f3d33),
                   backgroundColor: const Color(0xffffe4df),
