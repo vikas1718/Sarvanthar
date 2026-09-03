@@ -126,8 +126,9 @@ class _SubscriptionGate extends StatelessWidget {
       params: {'p_business_id': businessId},
     ),
     builder: (context, snapshot) {
-      if (!snapshot.hasData)
+      if (!snapshot.hasData) {
         return const Center(child: CircularProgressIndicator());
+      }
       final status = Map<String, dynamic>.from(snapshot.data!.first as Map);
       if (status['is_active'] == true) {
         final plan = status['plan'] as String;
@@ -155,7 +156,9 @@ class _SubscriptionGate extends StatelessWidget {
           ],
         );
       }
-      if (allowWhenExpired) return child;
+      if (allowWhenExpired) {
+        return child;
+      }
       return _PageShell(
         title: 'Your free trial has expired',
         subtitle: 'Your restaurant features are locked. Upgrade to Pro to restore full access.',
@@ -390,7 +393,7 @@ class _SidebarBrandLogo extends StatelessWidget {
         width: 34,
         height: 34,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _BrandFallbackIcon(),
+        errorBuilder: (_, _, _) => _BrandFallbackIcon(),
       ),
     );
   }
@@ -1367,7 +1370,7 @@ class _NewOrderPageState extends State<_NewOrderPage> {
             if (_orderType == 'Dine-in')
               _Panel(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedTable,
+                  initialValue: _selectedTable,
                   decoration: const InputDecoration(
                     labelText: 'Table selector',
                   ),

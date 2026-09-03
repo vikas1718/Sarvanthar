@@ -7,8 +7,17 @@ const PRODUCTION_APP_ORIGINS = new Set([
 ]);
 
 function allowedOrigin(origin: string | null) {
-  if (origin === "http://localhost:8080" || (origin && PRODUCTION_APP_ORIGINS.has(origin))) {
-    return origin;
+  if (!origin) return null;
+  try {
+    const parsedOrigin = new URL(origin);
+    const isLocalDevelopment =
+      parsedOrigin.protocol === "http:" &&
+      (parsedOrigin.hostname === "localhost" || parsedOrigin.hostname === "127.0.0.1");
+    if (isLocalDevelopment || PRODUCTION_APP_ORIGINS.has(origin)) {
+      return origin;
+    }
+  } catch {
+    return null;
   }
   return null;
 }
