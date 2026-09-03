@@ -4,6 +4,7 @@ class KitchenOrder {
     required this.businessId,
     required this.scope,
     required this.status,
+    required this.source,
     required this.currency,
     required this.totalAmount,
     required this.createdAt,
@@ -13,6 +14,7 @@ class KitchenOrder {
     this.diningTableId,
     this.tableNumber,
     this.stallName,
+    this.kotNumber,
   });
 
   factory KitchenOrder.fromJson(Map<String, dynamic> json) => KitchenOrder(
@@ -22,6 +24,8 @@ class KitchenOrder {
     diningTableId: json['dining_table_id'] as String?,
     scope: json['scope'] as String,
     status: json['status'] as String,
+    source: json['source'] as String? ?? 'qr',
+    kotNumber: (json['kot_number'] as num?)?.toInt(),
     tableNumber: json['table_number'] as String?,
     stallName: json['stall_name'] as String?,
     currency: json['currency'] as String? ?? 'INR',
@@ -31,13 +35,15 @@ class KitchenOrder {
     items: _maps(json['order_items']).map(KitchenOrderItem.fromJson).toList(),
   );
 
-  final String id, businessId, scope, status, currency;
+  final String id, businessId, scope, status, source, currency;
   final String? stallId, diningTableId, tableNumber, stallName;
+  final int? kotNumber;
   final double totalAmount;
   final DateTime createdAt, updatedAt;
   final List<KitchenOrderItem> items;
 
   String get shortId => id.substring(0, 8).toUpperCase();
+  String get sourceLabel => source == 'manual' ? 'Employee' : 'QR';
   String get locationLabel {
     if (tableNumber?.trim().isNotEmpty ?? false) {
       return 'Table ${tableNumber!.trim()}';

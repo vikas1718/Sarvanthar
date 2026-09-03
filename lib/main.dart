@@ -26,6 +26,7 @@ import 'features/qr/qr_service.dart';
 import 'features/qr/qr_token.dart';
 import 'features/kitchen/kitchen_order.dart';
 import 'features/kitchen/kitchen_service.dart';
+import 'features/orders/manual_order_service.dart';
 import 'features/payments/razorpay_checkout.dart';
 
 part 'core/router/app_router.dart';
@@ -42,6 +43,7 @@ part 'features/menu/menu_management_page.dart';
 part 'features/tables/table_management_page.dart';
 part 'features/qr/qr_management_page.dart';
 part 'features/kitchen/kitchen_page.dart';
+part 'features/orders/manual_order_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,9 +56,7 @@ Future<void> main() async {
         // Supabase Flutter owns the one-time web callback exchange and the
         // existing mobile deep-link handling. The router only reacts to the
         // resulting auth state.
-        authOptions: const FlutterAuthClientOptions(
-          detectSessionInUri: true,
-        ),
+        authOptions: const FlutterAuthClientOptions(detectSessionInUri: true),
       );
     } catch (_) {
       initializationError =

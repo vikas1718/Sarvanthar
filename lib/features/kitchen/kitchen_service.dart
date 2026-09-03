@@ -7,7 +7,7 @@ class KitchenService {
   final SupabaseClient _client;
 
   static const _orderGraph = '''
-    id,business_id,stall_id,dining_table_id,scope,status,table_number,stall_name,
+    id,business_id,stall_id,dining_table_id,scope,status,source,kot_number,table_number,stall_name,
     currency,total_amount,created_at,updated_at,
     order_items(id,menu_item_id,item_name,unit_price,options_total,quantity,
       line_total,created_at,order_item_options(id,menu_option_id,option_group_id,
@@ -33,6 +33,14 @@ class KitchenService {
   Future<void> updateStatus(String orderId, String status) => _client.rpc(
     'update_order_status',
     params: {'p_order_id': orderId, 'p_new_status': status},
+  );
+
+  Future<void> saveItems({
+    required String orderId,
+    required List<Map<String, dynamic>> items,
+  }) => _client.rpc(
+    'save_kot_order',
+    params: {'p_order_id': orderId, 'p_items': items},
   );
 
   /// `orders` is an invalidation signal. Re-fetch the nested graph on every

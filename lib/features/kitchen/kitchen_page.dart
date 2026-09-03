@@ -112,6 +112,29 @@ class _KitchenPageState extends State<KitchenPage> {
     }
   }
 
+  Future<void> _edit(KitchenOrder order) async {
+    if (order.status == 'completed' || order.status == 'cancelled') return;
+    final draft = order.items
+        .map(
+          (item) => _KotDraftItem(
+            item.menuItemId,
+            item.name,
+            item.quantity,
+            item.options.map((option) => option.menuOptionId).toList(),
+          ),
+        )
+        .toList();
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          _KotEditDialog(order: order, items: draft, service: _service),
+    );
+    if (saved == true) {
+      await _load(progress: false);
+      if (mounted) _notice(context, 'KOT changes saved successfully.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) => _PageShell(
     title: 'Kitchen orders',
@@ -147,6 +170,7 @@ class _KitchenPageState extends State<KitchenPage> {
                       role: widget.role,
                       updating: _updating.contains(order.id),
                       onStatus: (status) => _update(order, status),
+                      onEdit: () => _edit(order),
                     ),
                   ),
                 )
@@ -161,11 +185,13 @@ class _KitchenOrderCard extends StatelessWidget {
     required this.role,
     required this.updating,
     required this.onStatus,
+    required this.onEdit,
   });
   final KitchenOrder order;
   final String role;
   final bool updating;
   final ValueChanged<String> onStatus;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -180,11 +206,17 @@ class _KitchenOrderCard extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Text(
-                '#${order.shortId}',
+                'KOT #${order.kotNumber ?? order.shortId}',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               _KitchenStatus(order.status),
               _KitchenMeta(Icons.place_outlined, order.locationLabel),
+              _KitchenMeta(
+                order.source == 'manual'
+                    ? Icons.person_outline
+                    : Icons.qr_code_2_outlined,
+                order.sourceLabel,
+              ),
               _KitchenMeta(
                 Icons.schedule_outlined,
                 _orderTime(context, order.createdAt),
@@ -211,7 +243,15 @@ class _KitchenOrderCard extends StatelessWidget {
                   dimension: 24,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              else
+              else ...[
+                if (order.status != 'completed' &&
+                    order.status != 'cancelled' &&
+                    const {'owner', 'manager', 'kitchen'}.contains(role))
+                  OutlinedButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit KOT'),
+                  ),
                 ...actions.map(
                   (status) => status == 'cancelled'
                       ? OutlinedButton(
@@ -223,12 +263,194 @@ class _KitchenOrderCard extends StatelessWidget {
                           child: Text(_actionLabel(status)),
                         ),
                 ),
+              ],
             ],
           ),
         ],
       ),
     );
   }
+}
+
+class _KotDraftItem {
+  _KotDraftItem(
+    this.menuItemId,
+    this.name,
+    this.quantity, [
+    this.optionIds = const [],
+  ]);
+  final String menuItemId;
+  final String name;
+  int quantity;
+  final List<String> optionIds;
+}
+
+class _KotEditDialog extends StatefulWidget {
+  const _KotEditDialog({
+    required this.order,
+    required this.items,
+    required this.service,
+  });
+  final KitchenOrder order;
+  final List<_KotDraftItem> items;
+  final KitchenService service;
+
+  @override
+  State<_KotEditDialog> createState() => _KotEditDialogState();
+}
+
+class _KotEditDialogState extends State<_KotEditDialog> {
+  late final Future<List<MenuItem>> _menu;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _menu = MenuService(Supabase.instance.client)
+        .items(widget.order.businessId, widget.order.stallId);
+  }
+
+  Future<void> _save() async {
+    if (widget.items.isEmpty) {
+      _notice(context, 'A KOT needs at least one item.');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await widget.service.saveItems(
+        orderId: widget.order.id,
+        items: widget.items
+            .map(
+              (item) => {
+                'menu_item_id': item.menuItemId,
+                'quantity': item.quantity,
+                'option_ids': item.optionIds,
+              },
+            )
+            .toList(),
+      );
+      if (mounted) Navigator.pop(context, true);
+    } on PostgrestException catch (e) {
+      if (mounted) _notice(context, e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: Text('Edit KOT #${widget.order.kotNumber ?? widget.order.shortId}'),
+    content: SizedBox(
+      width: 520,
+      child: FutureBuilder<List<MenuItem>>(
+        future: _menu,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const SizedBox(
+              height: 100,
+              child: Center(child: CircularProgressIndicator()),
+            );
+          final available = snapshot.data!
+              .where((item) => item.available)
+              .toList();
+          return SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Change quantities, remove items, or add another available menu item.',
+                ),
+                const SizedBox(height: 12),
+                ...widget.items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: item.quantity > 1
+                              ? () => setState(() => item.quantity--)
+                              : null,
+                          icon: const Icon(Icons.remove_circle_outline),
+                        ),
+                        Text('${item.quantity}'),
+                        IconButton(
+                          onPressed: () => setState(() => item.quantity++),
+                          icon: const Icon(Icons.add_circle_outline),
+                        ),
+                        IconButton(
+                          onPressed: () =>
+                              setState(() => widget.items.remove(item)),
+                          icon: const Icon(Icons.delete_outline),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const Divider(),
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(labelText: 'Add food item'),
+                  items: available
+                      .map(
+                        (item) => DropdownMenuItem(
+                          value: item.id,
+                          child: Text(
+                            '${item.name} · ₹${item.price.toStringAsFixed(0)}',
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (id) {
+                    if (id == null) return;
+                    final menuItem = available.firstWhere(
+                      (item) => item.id == id,
+                    );
+                    _KotDraftItem? existing;
+                    for (final item in widget.items) {
+                      if (item.menuItemId == id) {
+                        existing = item;
+                        break;
+                      }
+                    }
+                    setState(() {
+                      if (existing != null)
+                        existing!.quantity++;
+                      else
+                        widget.items.add(
+                          _KotDraftItem(menuItem.id, menuItem.name, 1),
+                        );
+                    });
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: _saving ? null : () => Navigator.pop(context),
+        child: const Text('Cancel'),
+      ),
+      FilledButton.icon(
+        onPressed: _saving ? null : _save,
+        icon: _saving
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.save_outlined),
+        label: const Text('SAVE CHANGES'),
+      ),
+    ],
+  );
 }
 
 class _KitchenItem extends StatelessWidget {

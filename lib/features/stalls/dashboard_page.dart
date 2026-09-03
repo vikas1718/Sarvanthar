@@ -41,7 +41,8 @@ class DashboardPage extends StatelessWidget {
     ('Menu', Icons.menu_book_outlined),
     ('Tables', Icons.table_restaurant_outlined),
     ('QR Codes', Icons.qr_code_2_rounded),
-    ('Orders', Icons.receipt_long_outlined),
+    ('Take Order', Icons.add_shopping_cart_outlined),
+    ('KOT Dashboard', Icons.receipt_long_outlined),
     ('Payments', Icons.payments_outlined),
     ('Reports', Icons.insights_outlined),
     ('Upgrade Plans', Icons.settings_outlined),
@@ -282,7 +283,11 @@ class _Sidebar extends StatelessWidget {
                             ['owner', 'manager'].contains(
                               access.split(' ').first.toLowerCase(),
                             )) &&
-                        (item.$1 != 'Orders' ||
+                        (item.$1 != 'Take Order' ||
+                            ['owner', 'manager', 'cashier'].contains(
+                              access.split(' ').first.toLowerCase(),
+                            )) &&
+                        (item.$1 != 'KOT Dashboard' ||
                             [
                               'owner',
                               'manager',
@@ -495,6 +500,7 @@ class _DashboardContent extends StatelessWidget {
     if (section == 'Overview') {
       return _Overview(
         staffRole: staffRole,
+        canTakeOrder: ['owner', 'manager', 'cashier'].contains(currentRole),
         onSection: onSection,
         userName: userName,
       );
@@ -538,9 +544,17 @@ class _DashboardContent extends StatelessWidget {
         stallId: selectedStallId,
       );
     }
-    if (section == 'Orders' &&
+    if (section == 'Take Order' &&
+        ['owner', 'manager', 'cashier'].contains(currentRole)) {
+      return ManualOrderPage(businessId: businessId, stallId: selectedStallId);
+    }
+    if (section == 'KOT Dashboard' &&
         ['owner', 'manager', 'kitchen', 'cashier'].contains(currentRole)) {
-      return const _NewOrderPage();
+      return KitchenPage(
+        businessId: businessId,
+        stallId: selectedStallId,
+        role: currentRole,
+      );
     }
     return _Restricted(title: section, staffRole: staffRole);
   }
@@ -594,10 +608,7 @@ class _UpgradePlansPageState extends State<_UpgradePlansPage> {
 
   void _handleExternalWallet(String? walletName) {
     debugPrint('Razorpay external wallet selected: $walletName');
-    _notice(
-      context,
-      'External wallet selected: ${walletName ?? 'unknown'}.',
-    );
+    _notice(context, 'External wallet selected: ${walletName ?? 'unknown'}.');
   }
 
   void _handleCheckoutDismissed() {
@@ -651,7 +662,10 @@ class _UpgradePlansPageState extends State<_UpgradePlansPage> {
     } catch (error) {
       debugPrint('Razorpay subscription creation failed: $error');
       if (mounted) {
-        _notice(context, 'Could not create the subscription. Please try again.');
+        _notice(
+          context,
+          'Could not create the subscription. Please try again.',
+        );
       }
     } finally {
       if (mounted) setState(() => _isCreatingSubscription = false);
@@ -690,9 +704,7 @@ class _UpgradePlansPageState extends State<_UpgradePlansPage> {
                 name: 'FREE TRIAL',
                 description: 'All features included',
                 price: '₹0',
-                features: const [
-                  ('All Basic plan features', true),
-                ],
+                features: const [('All Basic plan features', true)],
               ),
               _PlanCard(
                 name: 'BASIC',
@@ -927,12 +939,18 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
     try {
       final client = Supabase.instance.client;
       final uid = client.auth.currentUser!.id;
-      await client.from('profiles').update({'full_name': newName}).eq('id', uid);
+      await client
+          .from('profiles')
+          .update({'full_name': newName})
+          .eq('id', uid);
       final currentEmail = client.auth.currentUser?.email;
       if (newEmail.isNotEmpty && newEmail != currentEmail) {
         await client.auth.updateUser(UserAttributes(email: newEmail));
         if (context.mounted) {
-          _notice(context, 'Profile saved. Check your inbox to confirm the new email.');
+          _notice(
+            context,
+            'Profile saved. Check your inbox to confirm the new email.',
+          );
         }
       } else if (context.mounted) {
         _notice(context, 'Profile saved.');
@@ -995,7 +1013,9 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xffb85b4f)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xffb85b4f),
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -1026,7 +1046,10 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
           ? const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
             )
           : const Icon(Icons.save_outlined),
       label: Text(_savingProfile ? 'Saving...' : 'Save changes'),
@@ -1127,7 +1150,9 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
-                  onPressed: _updatingPassword ? null : () => _updatePassword(context),
+                  onPressed: _updatingPassword
+                      ? null
+                      : () => _updatePassword(context),
                   icon: _updatingPassword
                       ? const SizedBox(
                           width: 16,
@@ -1135,7 +1160,9 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.lock_reset_rounded),
-                  label: Text(_updatingPassword ? 'Updating...' : 'Update password'),
+                  label: Text(
+                    _updatingPassword ? 'Updating...' : 'Update password',
+                  ),
                 ),
               ),
             ],
@@ -1179,7 +1206,9 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
               ),
               const SizedBox(height: 18),
               FilledButton.tonalIcon(
-                onPressed: _deletingAccount ? null : () => _deleteAccount(context),
+                onPressed: _deletingAccount
+                    ? null
+                    : () => _deleteAccount(context),
                 icon: _deletingAccount
                     ? const SizedBox(
                         width: 16,
@@ -1187,7 +1216,9 @@ class _AccountSettingsPageState extends State<_AccountSettingsPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.warning_amber_rounded),
-                label: Text(_deletingAccount ? 'Deleting...' : 'Delete account'),
+                label: Text(
+                  _deletingAccount ? 'Deleting...' : 'Delete account',
+                ),
                 style: FilledButton.styleFrom(
                   foregroundColor: const Color(0xff8f3d33),
                   backgroundColor: const Color(0xffffe4df),
@@ -1737,10 +1768,12 @@ class _PageShell extends StatelessWidget {
 class _Overview extends StatelessWidget {
   const _Overview({
     required this.staffRole,
+    required this.canTakeOrder,
     required this.onSection,
     required this.userName,
   });
   final bool staffRole;
+  final bool canTakeOrder;
   final ValueChanged<String> onSection;
   final String? userName;
   @override
@@ -1751,10 +1784,22 @@ class _Overview extends StatelessWidget {
     subtitle: staffRole
         ? 'Kitchen access • Chaat & Co. and South Bowl'
         : 'Sunday, 16 August  •  The Courtyard Food Hall',
-    action: OutlinedButton.icon(
-      onPressed: () => _notice(c, "Showing today's service snapshot."),
-      icon: const Icon(Icons.calendar_today_outlined, size: 17),
-      label: const Text('Today'),
+    action: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        if (canTakeOrder)
+          FilledButton.icon(
+            onPressed: () => onSection('Take Order'),
+            icon: const Icon(Icons.add_shopping_cart_outlined, size: 18),
+            label: const Text('Take order'),
+          ),
+        OutlinedButton.icon(
+          onPressed: () => onSection('KOT Dashboard'),
+          icon: const Icon(Icons.receipt_long_outlined, size: 18),
+          label: const Text('KOT dashboard'),
+        ),
+      ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1819,7 +1864,7 @@ class _Overview extends StatelessWidget {
                 ),
         ),
         const SizedBox(height: 22),
-        _RecentOrders(onTap: () => onSection('Orders')),
+        _RecentOrders(onTap: () => onSection('KOT Dashboard')),
       ],
     ),
   );
